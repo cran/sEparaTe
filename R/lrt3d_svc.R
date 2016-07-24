@@ -128,8 +128,8 @@ lrt3d_svc<-function(formula, rep, data=list(), eps, maxiter, startmatU2, startma
   XU3=array(aperm(Xc, perm=c(3,1,2,4)), dim=c(n3, n2*n1, K))
   #Initialization of the algorithm
   iter=0
-  U3hatold=startmatU2
-  U2hatold=startmatU3
+  U3hatold=startmatU3
+  U2hatold=startmatU2
   tt1=U3hatold%x%U2hatold
   for (k in 1:K){U1int[,,k]=XU1[,,k]%*%solve(tt1)%*%aperm(XU1[,,k], perm=c(2,1))}
   U1hatold<-apply(U1int, MARGIN=c(1,2), sum)/(n2*n3*K)
@@ -214,8 +214,8 @@ lrt3d_svc<-function(formula, rep, data=list(), eps, maxiter, startmatU2, startma
     XU3=array(aperm(Xc, perm=c(3,1,2,4)), dim=c(n3, n2*n1, K))
     #Initialization of the algorithm
     iter=0
-    U3hatold=startmatU2
-    U2hatold=startmatU3
+    U3hatold=startmatU3
+    U2hatold=startmatU2
     tt1=U3hatold%x%U2hatold
     for (k in 1:K){U1int[,,k]=XU1[,,k]%*%solve(tt1)%*%aperm(XU1[,,k], perm=c(2,1))}
     U1hatold<-apply(U1int, MARGIN=c(1,2), sum)/(n2*n3*K)
