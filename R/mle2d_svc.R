@@ -65,81 +65,99 @@
 #'
 #' @export
 
-mle2d_svc <- function(formula, rep, data=list(), eps, maxiter, startmat)
-{#Enforcing default values
-  formula<-paste(deparse(formula), eval(rep), sep="+")
-  formula<-stats::as.formula(formula)
-  if (missing(eps)==TRUE){eps=1e-6}
-  if (missing(maxiter)==TRUE){maxiter=5000}
-  #Quality control of data with warning for missing values, and sample size
-  mf <- stats::model.frame(formula=formula, data=data)
-  if (sum(is.na(mf))>0){warning("Missing values are not accepted. Try to impute the missing values.")}
-  colnames(mf)[1]<-"value"
-  rpl.mf<-c(dim(mf)[2])
-  mf <-mf[order(mf[, rpl.mf]),]
-  mf[,2]<-as.numeric(mf[,2])
-  mf[,3]<-as.numeric(mf[,3])
-  n1<-length(unique(mf[,2]))
-  n2<-length(unique(mf[,3]))
-  K<-length(unique(mf[,4]))
-  if (missing(startmat)==TRUE){startmat<-diag(n2)}  #Value of matrix used for initialization
-  is.wholenumber <- function(x, tol = .Machine$double.eps^0.5)  abs(x - round(x)) < tol
-  if (is.wholenumber(max(n1/n2, n2/n1))) {Kmin=max(n1/n2, n2/n1)+1} else {Kmin=as.integer(max(n1/n2, n2/n1))+2}
-  if (K<=Kmin) {print("Sample size insufficient for estimation.")} #Ensuring sufficient sample size for estimation
-  #Setting up data for algorithm
-  dataX<-split(mf, mf[,rpl.mf])
-  X<-lapply(dataX, function(x) t(matrix(x$value,
-                                        nrow=n2,
-                                        ncol=n1
-  )))
-  Xmean<-Reduce("+", X) / K
-  Xc<-list()
-  U1int<-list()
-  U2int<-list()
-  #Initialization of the algorithm
-  for (k in 1:K) {Xc[[k]]<-X[[k]]-Xmean}
-  iter=0
-  U2hatold=startmat
-  for (k in 1:K){U1int[[k]]=Xc[[k]]%*%solve(U2hatold)%*%t(Xc[[k]])}
-  U1hatold<- Reduce("+", U1int)/(n2*K)
-  U1int<-list()
-  iter=iter+1
-  for (k in 1:K){U2int[[k]]=t(Xc[[k]])%*%solve(U1hatold)%*%Xc[[k]]}
-  U2hatnew<- Reduce("+", U2int)/(n1*K)
-  U2int<-list()
-  for (k in 1:K){U1int[[k]]=Xc[[k]]%*%solve(U2hatnew)%*%t(Xc[[k]])}
-  U1hatnew <- Reduce("+", U1int)/(n2*K)
-  U1int<-list()
-  #IMPORTANT: this is the MLE algorithm with iterations until convergence criterion is satisfied
-  while ((norm(U1hatnew-U1hatold, "F")>eps | norm(U2hatnew-U2hatold, "F")>eps) & iter<maxiter)
-  {iter=iter+1
-  U1hatold=U1hatnew
-  U2hatold=U2hatnew
-  for (k in 1:K){U2int[[k]]=t(Xc[[k]])%*%solve(U1hatold)%*%Xc[[k]]}
-  U2hatnew<- Reduce("+", U2int)/(n1*K)
-  U2int<-list()
-  for (k in 1:K){U1int[[k]]=Xc[[k]]%*%solve(U2hatnew)%*%t(Xc[[k]])}
-  U1hatnew<- Reduce("+", U1int)/(n2*K)
-  U1int<-list()
+mle2d_svc <- function (formula, rep, data = list(), eps, maxiter, startmat)
+{
+  formula <- paste(deparse(formula), eval(rep), sep = "+")
+  formula <- stats::as.formula(formula)
+  if (missing(eps) == TRUE) {
+    eps = 1e-06
   }
-  if(iter==maxiter) {
-    Iter<-c("Did not converge at maximum number of iterations given eps. Try to increase maxit and/or decrease eps.")
-    Convergence<-FALSE
-  } else  {
-    Iter<-iter
-    Convergence<-TRUE}
-  Shat<-U2hatnew%x%U1hatnew
-  #Printing out results
-  list(Call=formula,
-       Convergence=Convergence,
-       Iter=Iter,
-       Xmeanhat=Xmean,
-       First=c(names(mf)[2], levels(mf[,2])),
-       U1hat=U1hatnew,
-       Standardized.U1hat=U1hatnew/U1hatnew[1,1],
-       Second=c(names(mf)[3], levels(mf[,3])),
-       U2hat=U2hatnew,
-       Standardized.U2hat=U2hatnew*(U1hatnew[1,1]),
-       Shat=Shat
-  )
+  if (missing(maxiter) == TRUE) {
+    maxiter = 5000
+  }
+  mf <- stats::model.frame(formula = formula, data = data)
+  if (sum(is.na(mf)) > 0) {
+    warning("Missing values are not accepted. Try to impute the missing values.")
+  }
+  colnames(mf)[1] <- "value "
+  rpl.mf <- c(dim(mf)[2])
+  mf <- mf[order(mf[, rpl.mf]), ]
+  mf[, 2] <- as.numeric(mf[, 2])
+  mf[, 3] <- as.numeric(mf[, 3])
+  n1 <- length(unique(mf[, 2]))
+  n2 <- length(unique(mf[, 3]))
+  K <- length(unique(mf[, 4]))
+  if (missing(startmat) == TRUE) {
+    startmat <- diag(n2)
+  }
+  is.wholenumber <- function(x, tol = .Machine$double.eps^0.5) abs(x -
+                                                                     round(x)) < tol
+  if (is.wholenumber(max(n1/n2, n2/n1))) {
+    Kmin = max(n1/n2, n2/n1) + 1
+  }
+  else {
+    Kmin = as.integer(max(n1/n2, n2/n1)) + 2
+  }
+  if (K <= Kmin) {
+    print("Sample size insufficient for estimation.")
+  }
+  dataX <- split(mf, mf[, rpl.mf])
+  X <- lapply(dataX, function(x) t(matrix(x$value, nrow = n2,
+                                          ncol = n1)))
+  Xmean <- Reduce("+", X)/K
+  Xc <- list()
+  U1int <- list()
+  U2int <- list()
+  for (k in 1:K) {
+    Xc[[k]] <- X[[k]] - Xmean
+  }
+  iter = 0
+  U2hatold = startmat
+  for (k in 1:K) {
+    U1int[[k]] = Xc[[k]] %*% solve(U2hatold) %*% t(Xc[[k]])
+  }
+  U1hatold <- Reduce("+", U1int)/(n2 * K)
+  U1int <- list()
+  iter = iter + 1
+  for (k in 1:K) {
+    U2int[[k]] = t(Xc[[k]]) %*% solve(U1hatold) %*% Xc[[k]]
+  }
+  U2hatnew <- Reduce("+", U2int)/(n1 * K)
+  U2int <- list()
+  for (k in 1:K) {
+    U1int[[k]] = Xc[[k]] %*% solve(U2hatnew) %*% t(Xc[[k]])
+  }
+  U1hatnew <- Reduce("+", U1int)/(n2 * K)
+  U1int <- list()
+  while ((norm(U1hatnew - U1hatold, "F") > eps | norm(U2hatnew -
+                                                      U2hatold, "F") > eps) & iter < maxiter) {
+    iter = iter + 1
+    U1hatold = U1hatnew
+    U2hatold = U2hatnew
+    for (k in 1:K) {
+      U2int[[k]] = t(Xc[[k]]) %*% solve(U1hatold) %*% Xc[[k]]
+    }
+    U2hatnew <- Reduce("+", U2int)/(n1 * K)
+    U2int <- list()
+    for (k in 1:K) {
+      U1int[[k]] = Xc[[k]] %*% solve(U2hatnew) %*% t(Xc[[k]])
+    }
+    U1hatnew <- Reduce("+", U1int)/(n2 * K)
+    U1int <- list()
+  }
+  if (iter == maxiter) {
+    Iter <- c("Did not converge at maximum number of iterations given eps. Try to increase maxit and/or decrease eps.")
+    Convergence <- FALSE
+  }
+  else {
+    Iter <- iter
+    Convergence <- TRUE
+  }
+  Shat <- U2hatnew %x% U1hatnew
+  list(Call = formula, Convergence = Convergence, Iter = Iter,
+       Xmeanhat = Xmean, First = c(names(mf)[2], levels(mf[,
+                                                           2])), U1hat = U1hatnew, Standardized.U1hat = U1hatnew/U1hatnew[1,
+                                                                                                                          1], Second = c(names(mf)[3], levels(mf[, 3])), U2hat = U2hatnew,
+       Standardized.U2hat = U2hatnew * (U1hatnew[1, 1]), Shat = Shat)
 }
+

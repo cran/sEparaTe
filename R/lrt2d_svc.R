@@ -87,192 +87,232 @@
 #'
 #' @export
 
-lrt2d_svc<-function(formula, rep, data=list(), eps, maxiter, startmat, sign.level, n.simul)
-{#Enforcing default values
-  formula<-paste(deparse(formula), eval(rep), sep="+")
-  formula<-stats::as.formula(formula)
-  if (missing(eps)==TRUE){eps=1e-6}
-  if (missing(maxiter)==TRUE){maxiter=5000}
-  if (missing(sign.level)==TRUE){sign.level=0.95}
-  if (missing(n.simul)==TRUE) {n.simul=8000}
-  #Quality control of data with warning for missing values, and sample size
-  mf <- stats::model.frame(formula=formula, data=data)
-  if (sum(is.na(mf))>0){warning("Missing values are not accepted. Try to impute the missing values.")}
-  rpl.mf<-c(dim(mf)[2])
-  mf <-mf[order(mf[, rpl.mf]),]
-  colnames(mf)[1]<-"value"
-  mf[,2]<-as.numeric(mf[,2])
-  mf[,3]<-as.numeric(mf[,3])
-  n1<-length(unique(mf[,2]))
-  n2<-length(unique(mf[,3]))
-  K<-length(unique(mf[,4]))
-  if (missing(startmat)==TRUE){startmat<-diag(n2)}  #Value of matrix used for initialization
-  is.wholenumber <- function(x, tol = .Machine$double.eps^0.5)  abs(x - round(x)) < tol
-  if (is.wholenumber(max(n1/n2, n2/n1))) {Kmin=max(n1/n2, n2/n1)+1} else {Kmin=as.integer(max(n1/n2, n2/n1))+2}
-  if (K<=Kmin) {print("Sample size insufficient for estimation.")} #Ensuring sufficient sample size for estimation
-  if (K<(n1*n2)+1) {print ("Sample size insufficient for LRT of separability")} #Ensuring sufficient sample size for estimation
-  chi.df<-(n1*n2*(((n1*n2)+1)/2))-(n1*(((n1)+1)/2))-(n2*(((n2)+1)/2))+1
-  #Setting up data for algorithm
-  dataX<-split(mf, mf[,rpl.mf])
-  X<-lapply(dataX, function(x) t(matrix(x$value,
-                                        nrow=n2,
-                                        ncol=n1
-  )))
-  Xmean<-Reduce("+", X) / K
-  Xc<-list()
-  U1int<-list()
-  U2int<-list()
-  #Initialization of the algorithm
-  for (k in 1:K) {Xc[[k]]<-X[[k]]-Xmean}
-  iter=0
-  U2hatold=startmat
-  for (k in 1:K){U1int[[k]]=Xc[[k]]%*%solve(U2hatold)%*%t(Xc[[k]])}
-  U1hatold<- Reduce("+", U1int)/(n2*K)
-  U1int<-list()
-  iter=iter+1
-  for (k in 1:K){U2int[[k]]=t(Xc[[k]])%*%solve(U1hatold)%*%Xc[[k]]}
-  U2hatnew<- Reduce("+", U2int)/(n1*K)
-  U2int<-list()
-  for (k in 1:K){U1int[[k]]=Xc[[k]]%*%solve(U2hatnew)%*%t(Xc[[k]])}
-  U1hatnew <- Reduce("+", U1int)/(n2*K)
-  U1int<-list()
-  #IMPORTANT: this is the MLE algorithm with iterations until convergence criterion is satisfied
-  while ((norm(U1hatnew-U1hatold, "F")>eps | norm(U2hatnew-U2hatold, "F")>eps) & iter<maxiter)
-  {iter=iter+1
-  U1hatold=U1hatnew
-  U2hatold=U2hatnew
-  for (k in 1:K){U2int[[k]]=t(Xc[[k]])%*%solve(U1hatold)%*%Xc[[k]]}
-  U2hatnew<- Reduce("+", U2int)/(n1*K)
-  U2int<-list()
-  for (k in 1:K){U1int[[k]]=Xc[[k]]%*%solve(U2hatnew)%*%t(Xc[[k]])}
-  U1hatnew<- Reduce("+", U1int)/(n2*K)
-  U1int<-list()
+lrt2d_svc <- function (formula, rep, data = list(), eps, maxiter, startmat,
+                       sign.level, n.simul)
+{
+  formula <- paste(deparse(formula), eval(rep), sep = "+")
+  formula <- stats::as.formula(formula)
+  if (missing(eps) == TRUE) {
+    eps = 1e-06
   }
-  if(iter==maxiter) {
-    Iter<-c("Did not converge at maximum number of iterations given eps. Try to increase maxit and/or decrease eps.")
-    Convergence<-FALSE
-  } else  {
-    Iter<-iter
-    Convergence<-TRUE}
-  #ML estimation under vector normal model
-  X.un<-lapply(X, function(x) as.vector(x))
-  Xmean.un<-Reduce("+", X.un) / K
-  S.un.all<-list() #CHANGE
-  for (k in 1:K){S.un.all[[k]]=as.matrix(X.un[[k]]-Xmean.un) %*% t(as.matrix(X.un[[k]]-Xmean.un))}
-  S.un<-Reduce("+", S.un.all)/K
-  #Lambda
-  Lambda<-(K-1)*((n2*log10(det(U1hatnew))) + (n1*log10(det(U2hatnew)))- log10(det(S.un)) )
-
+  if (missing(maxiter) == TRUE) {
+    maxiter = 5000
+  }
+  if (missing(sign.level) == TRUE) {
+    sign.level = 0.95
+  }
+  if (missing(n.simul) == TRUE) {
+    n.simul = 8000
+  }
+  mf <- stats::model.frame(formula = formula, data = data)
+  if (sum(is.na(mf)) > 0) {
+    warning("Missing values are not accepted. Try to impute the missing values.")
+  }
+  rpl.mf <- c(dim(mf)[2])
+  mf <- mf[order(mf[, rpl.mf]), ]
+  colnames(mf)[1] <- "value"
+  mf[, 2] <- as.numeric(mf[, 2])
+  mf[, 3] <- as.numeric(mf[, 3])
+  n1 <- length(unique(mf[, 2]))
+  n2 <- length(unique(mf[, 3]))
+  K <- length(unique(mf[, 4]))
+  if (missing(startmat) == TRUE) {
+    startmat <- diag(n2)
+  }
+  is.wholenumber <- function(x, tol = .Machine$double.eps^0.5) abs(x -
+                                                                     round(x)) < tol
+  if (is.wholenumber(max(n1/n2, n2/n1))) {
+    Kmin = max(n1/n2, n2/n1) + 1
+  }
+  else {
+    Kmin = as.integer(max(n1/n2, n2/n1)) + 2
+  }
+  if (K <= Kmin) {
+    print("Sample size insufficient for estimation.")
+  }
+  if (K < (n1 * n2) + 1) {
+    print("Sample size insufficient for LRT of separability")
+  }
+  chi.df <- (n1 * n2 * (((n1 * n2) + 1)/2)) - (n1 * (((n1) +
+                                                        1)/2)) - (n2 * (((n2) + 1)/2)) + 1
+  dataX <- split(mf, mf[, rpl.mf])
+  X <- lapply(dataX, function(x) t(matrix(x$value, nrow = n2,
+                                          ncol = n1)))
+  Xmean <- Reduce("+", X)/K
+  Xc <- list()
+  U1int <- list()
+  U2int <- list()
+  for (k in 1:K) {
+    Xc[[k]] <- X[[k]] - Xmean
+  }
+  iter = 0
+  U2hatold = startmat
+  for (k in 1:K) {
+    U1int[[k]] = Xc[[k]] %*% solve(U2hatold) %*% t(Xc[[k]])
+  }
+  U1hatold <- Reduce("+", U1int)/(n2 * K)
+  U1int <- list()
+  iter = iter + 1
+  for (k in 1:K) {
+    U2int[[k]] = t(Xc[[k]]) %*% solve(U1hatold) %*% Xc[[k]]
+  }
+  U2hatnew <- Reduce("+", U2int)/(n1 * K)
+  U2int <- list()
+  for (k in 1:K) {
+    U1int[[k]] = Xc[[k]] %*% solve(U2hatnew) %*% t(Xc[[k]])
+  }
+  U1hatnew <- Reduce("+", U1int)/(n2 * K)
+  U1int <- list()
+  while ((norm(U1hatnew - U1hatold, "F") > eps | norm(U2hatnew -
+                                                      U2hatold, "F") > eps) & iter < maxiter) {
+    iter = iter + 1
+    U1hatold = U1hatnew
+    U2hatold = U2hatnew
+    for (k in 1:K) {
+      U2int[[k]] = t(Xc[[k]]) %*% solve(U1hatold) %*% Xc[[k]]
+    }
+    U2hatnew <- Reduce("+", U2int)/(n1 * K)
+    U2int <- list()
+    for (k in 1:K) {
+      U1int[[k]] = Xc[[k]] %*% solve(U2hatnew) %*% t(Xc[[k]])
+    }
+    U1hatnew <- Reduce("+", U1int)/(n2 * K)
+    U1int <- list()
+  }
+  if (iter == maxiter) {
+    Iter <- c("Did not converge at maximum number of iterations given eps. Try to increase maxit and/or decrease eps.")
+    Convergence <- FALSE
+  }
+  else {
+    Iter <- iter
+    Convergence <- TRUE
+  }
+  X.un <- lapply(X, function(x) as.vector(x))
+  Xmean.un <- Reduce("+", X.un)/K
+  S.un.all <- list()
+  for (k in 1:K) {
+    S.un.all[[k]] = as.matrix(X.un[[k]] - Xmean.un) %*% t(as.matrix(X.un[[k]] -
+                                                                      Xmean.un))
+  }
+  S.un <- Reduce("+", S.un.all)/K
+  Lambda <- K  * ((n2 * log(det(U1hatnew))) + (n1 *
+                                                         log(det(U2hatnew))) - log(det(S.un)))
   U1out <- U1hatnew
   U2out <- U2hatnew
-
-  #Lambda star
-  mat.sqrt<-function(A)
-  {
-    ei<-eigen(A)
-    d<-ei$values
-    d<-(d+abs(d))/2
-    d2<-sqrt(d)
-    ans<-ei$vectors %*% diag(d2) %*% t(ei$vectors)
+  mat.sqrt <- function(A) {
+    ei <- eigen(A)
+    d <- ei$values
+    d <- (d + abs(d))/2
+    d2 <- sqrt(d)
+    ans <- ei$vectors %*% diag(d2) %*% t(ei$vectors)
   }
-  trueU1=diag(n1)
-  trueU2=diag(n2)
-  Lambda.simul<-c()
-  for (i in 1:n.simul){
-    Xsimul.all<-list()
-    for (k in 1:K){
-      Xsimul<-((mat.sqrt(trueU1))%*%(matrix(stats::rnorm(n1*n2),n1,n2))%*%(mat.sqrt(trueU2)))
-      infoX<-matrix(c(rep(1:n1, each=n2),
-                      rep(1:n2, n1),
-                      rep(k,n1*n2)),
-                    nrow=n1*n2 , ncol=3)
-      Xsimul<-matrix(t(Xsimul), nrow=n1*n2, ncol=1)
-      Xsimul.all[[k]]<-cbind(Xsimul,infoX)
+  trueU1 = diag(n1)
+  trueU2 = diag(n2)
+  Lambda.simul <- c()
+  for (i in 1:n.simul) {
+    Xsimul.all <- list()
+    for (k in 1:K) {
+      Xsimul <- ((mat.sqrt(trueU1)) %*% (matrix(stats::rnorm(n1 *
+                                                               n2), n1, n2)) %*% (mat.sqrt(trueU2)))
+      infoX <- matrix(c(rep(1:n1, each = n2), rep(1:n2,
+                                                  n1), rep(k, n1 * n2)), nrow = n1 * n2, ncol = 3)
+      Xsimul <- matrix(t(Xsimul), nrow = n1 * n2, ncol = 1)
+      Xsimul.all[[k]] <- cbind(Xsimul, infoX)
     }
-    Xsimul.all<-do.call(rbind.data.frame, Xsimul.all)
-    names(Xsimul.all)<-c("value", "Id1", "Id2", "K")
-    dataXsimul.all<-split(Xsimul.all, Xsimul.all[,dim(Xsimul.all)[2]])
-    Xsimul.all<-lapply(dataXsimul.all, function(x) t(matrix(x$value,
-                                                            nrow=n2,
-                                                            ncol=n1
-    )))
-    #UNSTRUCURED
-    X.un.simul<-lapply(Xsimul.all, function(x) as.vector(x))
-    Xmean.un.simul<-Reduce("+", X.un.simul) / K
-    S.un.all.simul<-list() #CHANGE
-    for (k in 1:K){S.un.all.simul[[k]]=as.matrix(X.un.simul[[k]]-Xmean.un.simul) %*% t(as.matrix(X.un.simul[[k]]-Xmean.un.simul))}
-    S.un.simul<-Reduce("+", S.un.all.simul)/K
-    #SEPARABLE
-    X<-lapply(dataXsimul.all, function(x) t(matrix(x$value,
-                                                   nrow=n2,
-                                                   ncol=n1
-    )))
-    Xmean<-Reduce("+", X) / K
-    Xc<-list()
-    U1int<-list()
-    U2int<-list()
-    #Initialization of the algorithm
-    for (k in 1:K) {Xc[[k]]<-X[[k]]-Xmean}
-    iter=0
-    U2hatold=startmat
-    for (k in 1:K){U1int[[k]]=Xc[[k]]%*%solve(U2hatold)%*%t(Xc[[k]])}
-    U1hatold<- Reduce("+", U1int)/(n2*K)
-    U1int<-list()
-    iter=iter+1
-    for (k in 1:K){U2int[[k]]=t(Xc[[k]])%*%solve(U1hatold)%*%Xc[[k]]}
-    U2hatnew<- Reduce("+", U2int)/(n1*K)
-    U2int<-list()
-    for (k in 1:K){U1int[[k]]=Xc[[k]]%*%solve(U2hatnew)%*%t(Xc[[k]])}
-    U1hatnew <- Reduce("+", U1int)/(n2*K)
-    U1int<-list()
-    #IMPORTANT: this is the MLE algorithm with iterations until convergence criterion is satisfied
-    while ((norm(U1hatnew-U1hatold, "F")>eps | norm(U2hatnew-U2hatold, "F")>eps) & iter<maxiter)
-    {iter=iter+1
-    U1hatold=U1hatnew
-    U2hatold=U2hatnew
-    for (k in 1:K){U2int[[k]]=t(Xc[[k]])%*%solve(U1hatold)%*%Xc[[k]]}
-    U2hatnew<- Reduce("+", U2int)/(n1*K)
-    U2int<-list()
-    for (k in 1:K){U1int[[k]]=Xc[[k]]%*%solve(U2hatnew)%*%t(Xc[[k]])}
-    U1hatnew<- Reduce("+", U1int)/(n2*K)
-    U1int<-list()
+    Xsimul.all <- do.call(rbind.data.frame, Xsimul.all)
+    names(Xsimul.all) <- c("value", "Id1", "Id2", "K")
+    dataXsimul.all <- split(Xsimul.all, Xsimul.all[, dim(Xsimul.all)[2]])
+    Xsimul.all <- lapply(dataXsimul.all, function(x) t(matrix(x$value,
+                                                              nrow = n2, ncol = n1)))
+    X.un.simul <- lapply(Xsimul.all, function(x) as.vector(x))
+    Xmean.un.simul <- Reduce("+", X.un.simul)/K
+    S.un.all.simul <- list()
+    for (k in 1:K) {
+      S.un.all.simul[[k]] = as.matrix(X.un.simul[[k]] -
+                                        Xmean.un.simul) %*% t(as.matrix(X.un.simul[[k]] -
+                                                                          Xmean.un.simul))
     }
-    Lambda.simul[[i]]<-(K-1)*((n2*log10(det(U1hatnew))) + (n1*log10(det(U2hatnew)))- log10(det(S.un.simul)) )
-
+    S.un.simul <- Reduce("+", S.un.all.simul)/K
+    X <- lapply(dataXsimul.all, function(x) t(matrix(x$value,
+                                                     nrow = n2, ncol = n1)))
+    Xmean <- Reduce("+", X)/K
+    Xc <- list()
+    U1int <- list()
+    U2int <- list()
+    for (k in 1:K) {
+      Xc[[k]] <- X[[k]] - Xmean
+    }
+    iter = 0
+    U2hatold = startmat
+    for (k in 1:K) {
+      U1int[[k]] = Xc[[k]] %*% solve(U2hatold) %*% t(Xc[[k]])
+    }
+    U1hatold <- Reduce("+", U1int)/(n2 * K)
+    U1int <- list()
+    iter = iter + 1
+    for (k in 1:K) {
+      U2int[[k]] = t(Xc[[k]]) %*% solve(U1hatold) %*% Xc[[k]]
+    }
+    U2hatnew <- Reduce("+", U2int)/(n1 * K)
+    U2int <- list()
+    for (k in 1:K) {
+      U1int[[k]] = Xc[[k]] %*% solve(U2hatnew) %*% t(Xc[[k]])
+    }
+    U1hatnew <- Reduce("+", U1int)/(n2 * K)
+    U1int <- list()
+    while ((norm(U1hatnew - U1hatold, "F") > eps | norm(U2hatnew -
+                                                        U2hatold, "F") > eps) & iter < maxiter) {
+      iter = iter + 1
+      U1hatold = U1hatnew
+      U2hatold = U2hatnew
+      for (k in 1:K) {
+        U2int[[k]] = t(Xc[[k]]) %*% solve(U1hatold) %*%
+          Xc[[k]]
+      }
+      U2hatnew <- Reduce("+", U2int)/(n1 * K)
+      U2int <- list()
+      for (k in 1:K) {
+        U1int[[k]] = Xc[[k]] %*% solve(U2hatnew) %*%
+          t(Xc[[k]])
+      }
+      U1hatnew <- Reduce("+", U1int)/(n2 * K)
+      U1int <- list()
+    }
+    Lambda.simul[[i]] <- K * ((n2 * log(det(U1hatnew))) +
+                                       (n1 * log(det(U2hatnew))) - log(det(S.un.simul)))
   }
-  modified.critical.value<-as.numeric(stats::quantile(Lambda.simul, sign.level))
-
-  empirical.quantiles <- as.numeric(stats::quantile(Lambda.simul, prob = c(.01, .05, .1, .25, .5, .75, .9, .95, .99)))
-  theoretical.quantiles <- as.numeric(stats::quantile(Lambda, prob = c(.01, .05, .1, .25, .5, .75, .9, .95, .99)))
-
-  #Decision
-  critical.value<-stats::qchisq(sign.level, chi.df)
-  Decision.lambda<-c()
-  if (Lambda > critical.value){
-    Decision.lambda<-c("Reject null hypothesis of separabiltiy.")
-  } else {
-    Decision.lambda<-c("Fail to reject null hypothesis of separability.")
+  modified.critical.value <- as.numeric(stats::quantile(Lambda.simul,
+                                                        sign.level))
+  empirical.quantiles <- as.numeric(stats::quantile(Lambda.simul,
+                                                    prob = c(0.01, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95,
+                                                             0.99)))
+  theoretical.quantiles <- as.numeric(stats::quantile(Lambda,
+                                                      prob = c(0.01, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95,
+                                                               0.99)))
+  critical.value <- stats::qchisq(sign.level, chi.df)
+  Decision.lambda <- c()
+  if (Lambda > critical.value) {
+    Decision.lambda <- c("Reject null hypothesis of separability.")
   }
-  Decision.lambda.modified<-c()
-  if (Lambda > modified.critical.value){
-    Decision.lambda.modified<-c("Reject null hypothesis of separabiltiy.")
-  } else {
-    Decision.lambda.modified<-c("Fail to reject null hypothesis of separability.")
+  else {
+    Decision.lambda <- c("Fail to reject null hypothesis of separability.")
   }
-
-  list(Convergence=Convergence,
-       chi.df=chi.df,
-       Lambda=Lambda,
-       critical.value=critical.value,
-       Decision.lambda=Decision.lambda,
-       Simulation.critical.value=modified.critical.value,
-       Decision.lambda.simulation=Decision.lambda.modified,
-       Penalty=as.numeric(-(length(unique(mf[,4])))*(stats::coef(stats::lm(empirical.quantiles ~ theoretical.quantiles - 1)))+(length(unique(mf[,4])))),
-       U1hat = U1out,
-       Standardized.U1hat=U1out/U1out[1,1],
-       U2hat = U2out,
-       Standardized.U2hat=U2out*U1out[1,1],
-       Shat=(U2out*U1out[1,1]) %x% (U1out/U1out[1,1])
-    )
+  Decision.lambda.modified <- c()
+  if (Lambda > modified.critical.value) {
+    Decision.lambda.modified <- c("Reject null hypothesis of separability .")
+  }
+  else {
+    Decision.lambda.modified <- c("Fail to reject null hypothesis of separability.")
+  }
+  list(Convergence = Convergence, chi.df = chi.df, Lambda = Lambda,
+       critical.value = critical.value, Decision.lambda = Decision.lambda,
+       Simulation.critical.value = modified.critical.value,
+       Decision.lambda.simulation = Decision.lambda.modified,
+       Penalty = as.numeric(-(length(unique(mf[, 4]))) * (stats::coef(stats::lm(empirical.quantiles ~
+                                                                                  theoretical.quantiles - 1))) + (length(unique(mf[,
+                                                                                                                                   4])))) , U1hat = U1out, Standardized.U1hat = U1out/U1out[1,
+                                                                                                                                                                                            1], U2hat = U2out, Standardized.U2hat = U2out * U1out[1,
+                                                                                                                                                                                                                                                  1], Shat = (U2out * U1out[1, 1]) %x% (U1out/U1out[1,
+                                                                                                                                                                                                                                                                                                    1]))
 }
 
