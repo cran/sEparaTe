@@ -4,16 +4,25 @@
 \alias{lrt3d_svc}
 \title{An unbiased modified likelihood ratio test for double separability of a variance-covariance structure.}
 \usage{
-lrt3d_svc(formula, rep, data = list(), eps, maxiter, startmatU2, startmatU3,
-  sign.level, n.simul)
+lrt3d_svc(
+  formula_3d,
+  subject,
+  data_3d = list(),
+  eps,
+  maxiter,
+  startmatU2,
+  startmatU3,
+  sign.level,
+  n.simul
+)
 }
 \arguments{
-\item{formula}{value3d~Id3+Id4+Id5}
+\item{formula_3d}{value3d~Id3+Id4+Id5}
 
-\item{rep}{the replicate, also called subject or individual, the first column
+\item{subject}{the replicate, also called individual, the first column
 in the tensor (3d) data file}
 
-\item{data}{the name of the tensor data}
+\item{data_3d}{the name of the tensor data}
 
 \item{eps}{the threshold in the stopping criterion for the iterative mle
 algorithm (estimation)}
@@ -35,19 +44,17 @@ test is derived by simulations from the sampling distribution of the LRT statist
 
 \item{n.simul}{the number of simulations used to build the sampling distribution
 of the LRT statistic under the null hypothesis, using the same characteristics as the
-i.i.d. random sample from a tensor normal distribution.
-At least 8000 simulations are recommended in applications with same
-characteristics as the example here.}
+i.i.d. random sample from a tensor normal distribution}
 }
 \description{
 A likelihood ratio test (LRT) for double separability of a variance-covariance
-   structure, modified to be unbiased in finite samples. The modification is a
-   penalty-based homothetic transformation of the LRT statistic. The penalty
-   value is optimized for a given mean model, which is left unstructured here. In
-   the required function, the Id3, Id4 and Id5 variables correspond to the row, column
-   and edge subscripts, and are the second, third and fourth columns in the tensor
-   (3d) data file, respectively; \dQuote{value3d} refers to the observed
-   variable, and is the fifth column in the tensor data file.
+structure, modified to be unbiased in finite samples. The modification is a
+penalty-based homothetic transformation of the LRT statistic. The penalty
+value is optimized for a given mean model, which is left unstructured here. In
+the required function, the Id3, Id4 and Id5 variables correspond to the row, column
+and edge subscripts, and are the second, third and fourth columns in the tensor
+(3d) data file, respectively; \dQuote{value3d} refers to the observed
+variable, and is the fifth column in the tensor data file.
 }
 \section{Output}{
 
@@ -55,41 +62,41 @@ A likelihood ratio test (LRT) for double separability of a variance-covariance
 \dQuote{Convergence}, TRUE or FALSE
 
 \dQuote{chi.df}, the theoretical number of degrees of freedom of the asymptotic
-   chi-square distribution that would apply to the unmodified LRT statistic for double separability
-   of a variance-covariance structure
+chi-square distribution that would apply to the unmodified LRT statistic for double separability
+of a variance-covariance structure
 \dQuote{Lambda}, the observed value of the unmodified LRT statistic
 
 \dQuote{critical.value}, the critical value at the specified significance
-   level for the chi-square distribution with \dQuote{chi.df} degrees of freedom
+level for the chi-square distribution with \dQuote{chi.df} degrees of freedom
 
 \dQuote{Decision.lambda}, the decision (acceptance/rejection) regarding the null
-   hypothesis of double separability, made using the theoretical (biased unmodified) LRT
+hypothesis of double separability, made using the theoretical (biased unmodified) LRT
 
 \dQuote{Simulation.critical.value}, the critical value at the specified significance
-   level that is derived from the sampling distribution of the unbiased modified LRT statistic
+level that is derived from the sampling distribution of the unbiased modified LRT statistic
 
 \dQuote{Decision.lambda.simulation}, the decision (acceptance/rejection) regarding
-   the null hypothesis of double separability, made using the unbiased modified LRT
+the null hypothesis of double separability, made using the unbiased modified LRT
 
 \dQuote{Penalty}, the optimized penalty value used in the homothetic transformation
-   between the biased unmodified and unbiased modified LRT statistics
+between the biased unmodified and unbiased modified LRT statistics
 
 \dQuote{U1hat}, the estimated variance-covariance matrix for the rows
 
 \dQuote{Standardized_U1hat}, the standardized estimated variance-covariance matrix
-   for the rows; the standardization is performed by dividing each entry of U1hat by
-   entry(1, 1) of U1hat
+for the rows; the standardization is performed by dividing each entry of U1hat by
+entry(1, 1) of U1hat
 
 \dQuote{U2hat}, the estimated variance-covariance matrix for the columns
 
 \dQuote{Standardized_U2hat}, the standardized estimated variance-covariance matrix
-   for the columns; the standardization is performed by multiplying each entry of
-   U2hat by entry(1, 1) of U1hat
+for the columns; the standardization is performed by multiplying each entry of
+U2hat by entry(1, 1) of U1hat
 
 \dQuote{U3hat}, the estimated variance-covariance matrix for the edges
 
 \dQuote{Shat}, the sample variance-covariance matrix computed from the
-   vectorized data tensors
+vectorized data tensors
 }
 
 \section{References}{
@@ -99,11 +106,9 @@ Manceur AM, Dutilleul P. 2013. Unbiased modified likelihood ratio tests for simp
 separability of a variance-covariance structure. Statistics
 and Probability Letters 83: 631-636.
 }
+
 \examples{
-#To reduce the time elapsed, this example uses only 160 simulations.
-#8000 simulations or more are recommended in an example like this.
-output <- lrt3d_svc(value3d~Id3+Id4+Id5, rep = "K", data = data3d, n.simul = 160)
+output <- lrt3d_svc(value3d~Id3+Id4+Id5, subject = "K", data_3d = data3d, n.simul = 100)
 output
 
 }
-

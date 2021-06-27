@@ -3,15 +3,14 @@
 \docType{package}
 \name{sEparaTe}
 \alias{sEparaTe}
-\alias{sEparaTe-package}
 \title{MLE and LRT functions for separable variance-covariance structures}
 \description{
 A package for maximum likelihood estimation (MLE) of the parameters of matrix and
-   3rd-order tensor normal distributions with unstructured factor
-   variance-covariance matrices (two procedures),
-   and for unbiased modified
-   likelihood ratio testing (LRT) of simple and double separability for
-   variance-covariance structures (two procedures).
+3rd-order tensor normal distributions with unstructured factor
+variance-covariance matrices (two procedures),
+and for unbiased modified
+likelihood ratio testing (LRT) of simple and double separability for
+variance-covariance structures (two procedures).
 }
 \section{Functions}{
 

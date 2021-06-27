@@ -4,15 +4,15 @@
 \alias{mle2d_svc}
 \title{Maximum likelihood estimation of the parameters of a matrix normal distribution}
 \usage{
-mle2d_svc(formula, rep, data = list(), eps, maxiter, startmat)
+mle2d_svc(formula_2d, subject, data_2d = list(), eps, maxiter, startmat)
 }
 \arguments{
-\item{formula}{value2d~Id1+Id2}
+\item{formula_2d}{value2d~Id1+Id2}
 
-\item{rep}{the replicate, also called subject or individual,
+\item{subject}{the replicate, also called individual,
 the first column in the matrix (2d) data file}
 
-\item{data}{the name of the matrix data}
+\item{data_2d}{the name of the matrix data}
 
 \item{eps}{the threshold in the stopping criterion for the iterative mle algorithm}
 
@@ -24,16 +24,16 @@ of the first factor variance-covariance matrix}
 }
 \description{
 Maximum likelihood estimation for the parameters of a matrix normal
-   distribution \bold{X}, which is characterized by a simply separable
-   variance-covariance structure. In the general case, which is the case
-   considered here, two unstructured factor
-   variance-covariance matrices determine the covariability of random
-   matrix entries, depending on the row (one factor matrix)
-   and the column (the other factor matrix) where two
-   \bold{X}-entries are. In the required function, the Id1 and Id2 variables correspond to
-   the row and column subscripts, and are the second and third columns in the matrix
-   (2d) data file, respectively; \dQuote{value}
-   indicates the observed variable, and is the fourth column in the matrix data file.
+distribution \bold{X}, which is characterized by a simply separable
+variance-covariance structure. In the general case, which is the case
+considered here, two unstructured factor
+variance-covariance matrices determine the covariability of random
+matrix entries, depending on the row (one factor matrix)
+and the column (the other factor matrix) where two
+\bold{X}-entries are. In the required function, the Id1 and Id2 variables correspond to
+the row and column subscripts, and are the second and third columns in the matrix
+(2d) data file, respectively; \dQuote{value}
+indicates the observed variable, and is the fourth column in the matrix data file.
 }
 \section{Output}{
 
@@ -49,16 +49,16 @@ Maximum likelihood estimation for the parameters of a matrix normal
 \dQuote{U1hat}, the estimated variance-covariance matrix for the rows
 
 \dQuote{Standardized.U1hat}, the standardized estimated variance-covariance matrix
-   for the rows; the standardization is performed by dividing each entry of U1hat
-   by entry(1, 1) of U1hat
+for the rows; the standardization is performed by dividing each entry of U1hat
+by entry(1, 1) of U1hat
 
 \dQuote{Second}, the column subscript, or the third column in the data file
 
 \dQuote{U2hat}, the estimated variance-covariance matrix for the columns
 
 \dQuote{Standardized.U2hat}, the standardized estimated variance-covariance
-   matrix for the columns; the standardization is performed by multiplying each
-   entry of U2hat by entry(1, 1) of U1hat
+matrix for the columns; the standardization is performed by multiplying each
+entry of U2hat by entry(1, 1) of U1hat
 
 \dQuote{Shat}, is the sample variance-covariance matrix computed from of the vectorized data matrices
 }
@@ -75,9 +75,9 @@ Dutilleul P. 1999. The mle algorithm for the matrix
 normal distribution. Journal of Statistical Computation
 and Simulation 64: 105-123.
 }
+
 \examples{
-output <- mle2d_svc(value2d~Id1+Id2, rep = "K", data = data2d)
+output <- mle2d_svc(value2d~Id1+Id2, subject = "K", data_2d = data2d)
 output
 
 }
-

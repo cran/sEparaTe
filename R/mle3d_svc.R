@@ -13,9 +13,9 @@
 #' (3d) data file, respectively; \dQuote{value3d} indicates the observed
 #' variable, and is the fifth column in the tensor data file.
 #'
-#' @param formula value3d~Id3+Id4+Id5
-#' @param rep the replicate, also called subject or individual, the first column in the tensor (3d) data file
-#' @param data the name of the tensor data
+#' @param formula_3d value3d~Id3+Id4+Id5
+#' @param subject the replicate, also called individual, the first column in the tensor (3d) data file
+#' @param data_3d the name of the tensor data
 #' @param eps the threshold in the stopping criterion for the iterative mle algorithm
 #' @param maxiter the maximum number of iterations for the iterative mle algorithm
 #' @param startmatU2 the value of the second factor variance covariance matrix used for initialization
@@ -56,26 +56,20 @@
 #' Journal of Computational and Applied Mathematics 239: 37-49.
 #'
 #' @examples
-#' output <- mle3d_svc(value3d~Id3+Id4+Id5, rep = "K", data = data3d)
+#' output <- mle3d_svc(value3d~Id3+Id4+Id5, subject = "K", data = data3d)
 #' output
 #'
 #' @export
 
-mle3d_svc <- function (formula, rep, data = list(), eps, maxiter, startmatU2,
-                       startmatU3)
-{
-  formula <- paste(deparse(formula), eval(rep), sep = "+")
-  formula <- stats::as.formula(formula)
-  if (missing(eps) == TRUE) {
-    eps = 1e-06
-  }
-  if (missing(maxiter) == TRUE) {
-    maxiter = 100
-  }
-  mf <- stats::model.frame(formula = formula, data = data)
-  if (sum(is.na(mf)) > 0) {
-    warning("Missing values are not accepted. Try to impute the missing values.")
-  }
+mle3d_svc <- function(formula_3d, subject, data_3d = list(), eps, maxiter, startmatU2, startmatU3)
+{#Enforcing default values
+  formula_3d <- paste(deparse(formula_3d), eval(subject), sep = "+")
+  formula_3d <- stats::as.formula(formula_3d)
+  if (missing(eps) == TRUE){eps <- 1e-6}
+  if (missing(maxiter) == TRUE){maxiter <- 100}
+  #Quality control of data with warning for missing values, and sample size
+  mf <- stats::model.frame(formula = formula_3d, data = data_3d)
+  if (sum(is.na(mf)) > 0){warning("Missing values are not accepted. Try to impute the missing values.")}
   colnames(mf)[1] <- "value"
   rpl.mf <- c(dim(mf)[2])
   mf <- mf[order(mf[, rpl.mf]), ]
@@ -86,116 +80,74 @@ mle3d_svc <- function (formula, rep, data = list(), eps, maxiter, startmatU2,
   n2 <- length(unique(mf[, 3]))
   n3 <- length(unique(mf[, 4]))
   K <- length(unique(mf[, rpl.mf]))
-  if (missing(startmatU2) == TRUE) {
-    startmatU2 <- diag(n2)
-  }
-  if (missing(startmatU3) == TRUE) {
-    startmatU3 <- diag(n3)
-  }
-  is.wholenumber <- function(x, tol = .Machine$double.eps^0.5) abs(x -
-                                                                     round(x)) < tol
-  if (is.wholenumber(max(n1/(n2 * n3), n2/(n1 * n3), n3/(n1 *
-                                                         n2)))) {
-    Kmin = max(n1/(n2 * n3), n2/(n1 * n3), n3/(n1 * n2)) +
-      1
-  }
-  else {
-    Kmin = as.integer(max(n1/(n2 * n3), n2/(n1 * n3), n3/(n1 *
-                                                            n2))) + 2
-  }
-  if (K <= Kmin) {
-    print("Sample size insufficient for estimation.")
-  }
+  if (missing(startmatU2) == TRUE){startmatU2 <- diag(n2)}  #Value of matrix used for initialization
+  if (missing(startmatU3) == TRUE){startmatU3 <- diag(n3)}  #Value of matrix used for initialization
+  is.wholenumber <- function(x, tol = .Machine$double.eps^0.5)  abs(x - round(x)) < tol
+  if (is.wholenumber(max(n1 / (n2 * n3), n2 / (n1 * n3), n3 / (n1 * n2)))) {Kmin <- max(n1 / (n2 * n3), n2 / (n1 * n3), n3 / (n1 * n2)) + 1} else {Kmin <- as.integer(max(n1 / (n2 * n3), n2 / (n1 * n3), n3 / (n1 * n2))) + 2}
+  if (K <= Kmin) {print("Sample size insufficient for estimation.")} #Ensuring sufficient sample size for estimation
+  #Setting up data for algorithm
   X <- array(mf$value, dim = c(n3, n2, n1, K))
-  Xmean <- apply(X, MARGIN = c(1, 2, 3), sum)/K
+  Xmean <- apply(X, MARGIN = c(1, 2, 3), sum) / K
   Xc <- array(0, dim = c(n3, n2, n1, K))
   U1int <- array(0, dim = c(n1, n1, K))
   U2int <- array(0, dim = c(n2, n2, K))
   U3int <- array(0, dim = c(n3, n3, K))
-  for (k in 1:K) {
-    Xc[, , , k] <- X[, , , k] - Xmean
+  for (k in 1:K) {Xc[ , , , k] <- X[ , , , k] - Xmean}
+  XU1 <- array(aperm(Xc, perm = c(1, 2, 3, 4)), dim = c(n1, n3 * n2, K))
+  XU2 <- array(aperm(Xc, perm = c(2, 1, 3, 4)), dim = c(n2, n3 * n1, K))
+  XU3 <- array(aperm(Xc, perm = c(3, 1, 2, 4)), dim = c(n3, n2 * n1, K))
+  U3hatold <- startmatU2
+  U2hatold <- startmatU3
+  iter <- 0
+  tt1 <- U3hatold %x% U2hatold
+  for (k in 1:K){U1int[, , k] <- XU1[, , k] %*% solve(tt1) %*% aperm(XU1[, , k], perm = c(2, 1))}
+  U1hatold<-apply(U1int, MARGIN=c(1,2), sum)/(n2 * n3 * K)
+  iter <- iter + 1
+  tt2 <- U3hatold %x% U1hatold
+  for (k in 1:K){U2int[, , k] <- XU2[, , k] %*% solve(tt2) %*% aperm(XU2[, , k], perm = c(2, 1))}
+  U2hatnew <- apply(U2int, MARGIN = c(1, 2), sum) / (n3 * n1 * K)
+  tt3 <- U2hatnew %x% U1hatold
+  for (k in 1:K){U3int[, , k] <- XU3[, , k] %*% solve(tt3) %*% aperm(XU3[, , k], perm = c(2, 1))}
+  U3hatnew <- apply(U3int, MARGIN = c(1, 2), sum) / (n2 * n1 * K)
+  tt1 <- U3hatnew %x% U2hatnew
+  for (k in 1:K){U1int[, , k] <- XU1[, , k] %*% solve(tt1) %*% aperm(XU1[, , k], perm = c(2, 1))}
+  U1hatnew <- apply(U1int, MARGIN = c(1,2), sum)/(n2 * n3 * K)
+  #IMPORTANT: this is the MLE algorithm with iterations until convergence criterion is satisfied
+  while ((norm(U1hatnew - U1hatold, "F") > eps | norm(U2hatnew - U2hatold, "F") > eps | norm(U3hatnew - U3hatold, "F") > eps) & iter < maxiter)
+  {iter <- iter + 1
+  U1hatold <- U1hatnew
+  U2hatold <- U2hatnew
+  U3hatold <- U3hatnew
+  tt2 <- U3hatold %x% U1hatold
+  for (k in 1:K){U2int[, , k] <- XU2[, , k] %*% solve(tt2) %*% aperm(XU2[, , k], perm = c(2, 1))}
+  U2hatnew <- apply(U2int, MARGIN = c(1, 2), sum) / (n3 * n1 * K)
+  tt3 <- U2hatnew %x% U1hatold
+  for (k in 1:K){U3int[, , k] <- XU3[, , k] %*% solve(tt3) %*% aperm(XU3[, , k], perm = c(2, 1))}
+  U3hatnew <- apply(U3int, MARGIN = c(1, 2), sum) / (n2 * n1 * K)
+  tt1 <- U3hatnew %x% U2hatnew
+  for (k in 1:K){U1int[, , k] <- XU1[, , k] %*% solve(tt1) %*% aperm(XU1[, , k], perm = c(2, 1))}
+  U1hatnew <- apply(U1int, MARGIN = c(1, 2), sum) / (n2 * n3 * K)
   }
-  XU1 = array(aperm(Xc, perm = c(1, 2, 3, 4)), dim = c(n1,
-                                                       n3 * n2, K))
-  XU2 = array(aperm(Xc, perm = c(2, 1, 3, 4)), dim = c(n2,
-                                                       n3 * n1, K))
-  XU3 = array(aperm(Xc, perm = c(3, 1, 2, 4)), dim = c(n3,
-                                                       n2 * n1, K))
-  U3hatold = startmatU3
-  U2hatold = startmatU2
-  iter = 0
-  tt1 = U3hatold %x% U2hatold
-  for (k in 1:K) {
-    U1int[, , k] = XU1[, , k] %*% solve(tt1) %*% aperm(XU1[,
-                                                           , k], perm = c(2, 1))
-  }
-  U1hatold <- apply(U1int, MARGIN = c(1, 2), sum)/(n2 * n3 *
-                                                     K)
-  iter = iter + 1
-  tt2 = U3hatold %x% U1hatold
-  for (k in 1:K) {
-    U2int[, , k] = XU2[, , k] %*% solve(tt2) %*% aperm(XU2[,
-                                                           , k], perm = c(2, 1))
-  }
-  U2hatnew <- apply(U2int, MARGIN = c(1, 2), sum)/(n3 * n1 *
-                                                     K)
-  tt3 = U2hatnew %x% U1hatold
-  for (k in 1:K) {
-    U3int[, , k] = XU3[, , k] %*% solve(tt3) %*% aperm(XU3[,
-                                                           , k], perm = c(2, 1))
-  }
-  U3hatnew <- apply(U3int, MARGIN = c(1, 2), sum)/(n2 * n1 *
-                                                     K)
-  tt1 = U3hatnew %x% U2hatnew
-  for (k in 1:K) {
-    U1int[, , k] = XU1[, , k] %*% solve(tt1) %*% aperm(XU1[,
-                                                           , k], perm = c(2, 1))
-  }
-  U1hatnew <- apply(U1int, MARGIN = c(1, 2), sum)/(n2 * n3 *
-                                                     K)
-  while ((norm(U1hatnew - U1hatold, "F") > eps | norm(U2hatnew -
-                                                      U2hatold, "F") > eps | norm(U3hatnew - U3hatold, "F") >
-          eps) & iter < maxiter) {
-    iter = iter + 1
-    U1hatold <- U1hatnew
-    U2hatold <- U2hatnew
-    U3hatold <- U3hatnew
-    iter = iter + 1
-    tt2 = U3hatold %x% U1hatold
-    for (k in 1:K) {
-      U2int[, , k] = XU2[, , k] %*% solve(tt2) %*% aperm(XU2[,
-                                                             , k], perm = c(2, 1))
-    }
-    U2hatnew <- apply(U2int, MARGIN = c(1, 2), sum)/(n3 *
-                                                       n1 * K)
-    tt3 = U2hatnew %x% U1hatold
-    for (k in 1:K) {
-      U3int[, , k] = XU3[, , k] %*% solve(tt3) %*% aperm(XU3[,
-                                                             , k], perm = c(2, 1))
-    }
-    U3hatnew <- apply(U3int, MARGIN = c(1, 2), sum)/(n2 *
-                                                       n1 * K)
-    tt1 = U3hatnew %x% U2hatnew
-    for (k in 1:K) {
-      U1int[, , k] = XU1[, , k] %*% solve(tt1) %*% aperm(XU1[,
-                                                             , k], perm = c(2, 1))
-    }
-    U1hatnew <- apply(U1int, MARGIN = c(1, 2), sum)/(n2 *
-                                                       n3 * K)
-  }
-  if (iter == maxiter) {
+  if(iter == maxiter) {
     Iter <- c("Did not converge at maximum number of iterations given eps. Try to increase maxit and/or decrease eps.")
     Convergence <- FALSE
-  }
-  else {
+  } else {
     Iter <- iter
-    Convergence <- TRUE
-  }
+    Convergence <- TRUE}
   Shat <- U3hatnew %x% U2hatnew %x% U1hatnew
-  list(Call = formula, Convergence = Convergence, Iter = Iter,
-       Xmeanhat = Xmean, First = c(names(mf)[2], levels(mf[,
-                                                           2])), U1hat = U1hatnew, Standardized.U1hat = U1hatnew/U1hatnew[1,
-                                                                                                                          1], Second = c(names(mf)[3], levels(mf[, 3])), U2hat = U2hatnew,
-       Standardized.U2hat = U2hatnew * (U1hatnew[1, 1]), Third = c(names(mf)[4],
-                                                                   levels(mf[, 4])), U3hat = U3hatnew, Shat = Shat)
+  #Printing out results
+  list(Call = formula_3d,
+       Convergence = Convergence,
+       Iter = Iter,
+       Xmeanhat = Xmean,
+       First = c(names(mf)[2], levels(mf[, 2])),
+       U1hat = U1hatnew,
+       Standardized.U1hat = U1hatnew / U1hatnew[1, 1],
+       Second = c(names(mf)[3], levels(mf[, 3])),
+       U2hat = U2hatnew,
+       Standardized.U2hat = U2hatnew * (U1hatnew[1, 1]),
+       Third = c(names(mf)[4], levels(mf[, 4])),
+       U3hat = U3hatnew,
+       Shat = Shat
+  )
 }

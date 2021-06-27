@@ -12,10 +12,10 @@
 #'    (2d) data file, respectively; \dQuote{value}
 #'    indicates the observed variable, and is the fourth column in the matrix data file.
 #'
-#' @param formula value2d~Id1+Id2
-#' @param rep the replicate, also called subject or individual,
+#' @param formula_2d value2d~Id1+Id2
+#' @param subject the replicate, also called individual,
 #'    the first column in the matrix (2d) data file
-#' @param data the name of the matrix data
+#' @param data_2d the name of the matrix data
 #' @param eps the threshold in the stopping criterion for the iterative mle algorithm
 #' @param maxiter the maximum number of iterations for the iterative mle algorithm
 #' @param startmat the value of the second factor variance-covariance matrix used for
@@ -60,104 +60,87 @@
 #' and Simulation 64: 105-123.
 #'
 #' @examples
-#' output <- mle2d_svc(value2d~Id1+Id2, rep = "K", data = data2d)
+#' output <- mle2d_svc(value2d~Id1+Id2, subject = "K", data_2d = data2d)
 #' output
 #'
 #' @export
 
-mle2d_svc <- function (formula, rep, data = list(), eps, maxiter, startmat)
-{
-  formula <- paste(deparse(formula), eval(rep), sep = "+")
-  formula <- stats::as.formula(formula)
-  if (missing(eps) == TRUE) {
-    eps = 1e-06
-  }
-  if (missing(maxiter) == TRUE) {
-    maxiter = 5000
-  }
-  mf <- stats::model.frame(formula = formula, data = data)
-  if (sum(is.na(mf)) > 0) {
-    warning("Missing values are not accepted. Try to impute the missing values.")
-  }
-  colnames(mf)[1] <- "value "
-  rpl.mf <- c(dim(mf)[2])
+mle2d_svc <- function(formula_2d, subject, data_2d = list(), eps, maxiter, startmat)
+  {#Enforcing default values
+  formula_2d <- paste(deparse(formula_2d), eval(subject), sep = "+")
+  formula_2d <- stats::as.formula(formula_2d)
+  if (missing(eps) == TRUE) {eps <- 1e-6}
+  if (missing(maxiter) == TRUE){maxiter <- 5000}
+  #Quality control of data with warning for missing values, and sample size
+  mf <- stats::model.frame(formula = formula_2d, data = data_2d)
+  if (sum(is.na(mf)) > 0) {warning("Missing values are not accepted. Try to impute the missing values.")}
+  colnames(mf)[1] <- "value"
+  rpl.mf <- dim(mf)[2]
   mf <- mf[order(mf[, rpl.mf]), ]
   mf[, 2] <- as.numeric(mf[, 2])
   mf[, 3] <- as.numeric(mf[, 3])
   n1 <- length(unique(mf[, 2]))
   n2 <- length(unique(mf[, 3]))
-  K <- length(unique(mf[, 4]))
+  K <- length(unique(mf[,4]))
+  #Value of matrix used for initialization
   if (missing(startmat) == TRUE) {
     startmat <- diag(n2)
   }
-  is.wholenumber <- function(x, tol = .Machine$double.eps^0.5) abs(x -
-                                                                     round(x)) < tol
-  if (is.wholenumber(max(n1/n2, n2/n1))) {
-    Kmin = max(n1/n2, n2/n1) + 1
-  }
-  else {
-    Kmin = as.integer(max(n1/n2, n2/n1)) + 2
-  }
-  if (K <= Kmin) {
-    print("Sample size insufficient for estimation.")
-  }
+  is.wholenumber <- function(x, tol = .Machine$double.eps^0.5)  abs(x - round(x)) < tol
+  if (is.wholenumber(max(n1 / n2, n2 / n1))) {Kmin <- max(n1 / n2, n2 / n1) + 1} else {Kmin <- as.integer(max(n1 / n2, n2 / n1)) + 2}
+  #Ensuring sufficient sample size for estimation
+  if (K <= Kmin) {print("Sample size insufficient for estimation.")}
+  #Setting up data for algorithm
   dataX <- split(mf, mf[, rpl.mf])
-  X <- lapply(dataX, function(x) t(matrix(x$value, nrow = n2,
-                                          ncol = n1)))
-  Xmean <- Reduce("+", X)/K
-  Xc <- list()
-  U1int <- list()
-  U2int <- list()
-  for (k in 1:K) {
-    Xc[[k]] <- X[[k]] - Xmean
+  X <- lapply(dataX, function(x) t(matrix(x$value, nrow = n2, ncol = n1)))
+  Xmean <- Reduce("+", X) / K
+  Xc <- array(0, c(n1, n2, K))
+  U1int <- array(0, c(n1, n1, K))
+  U2int <- array(0, c(n2, n2, K))
+  #Initialization of the algorithm
+  for (k in 1:K) {Xc[, , k] <- X[[k]] - Xmean}
+  iter <- 0
+  U2hatold <- startmat
+  for (k in 1:K){U1int[, , k] <- Xc[, , k] %*% solve(U2hatold) %*% t(Xc[, , k])}
+  U1hatold <- rowSums(U1int, dims = 2)/ (n2 * K)
+  U1int <- array(0, c(n1, n1, K))
+  iter <- iter + 1
+  for (k in 1:K){U2int[, , k] <- t(Xc[, , k]) %*% solve(U1hatold) %*% (Xc[, , k])}
+  U2hatnew <- rowSums(U2int, dims = 2) / (n1 * K)
+  U2int <- array(0, c(n2, n2, K))
+  for (k in 1:K) {U1int[, , k] <- Xc[, , k] %*% solve(U2hatnew) %*% t(Xc[, , k])}
+  U1hatnew <- rowSums(U1int, dims = 2) / (n2 * K)
+  U1int <- array(0, c(n1, n1, K))
+  #IMPORTANT: this is the MLE algorithm with iterations until convergence criterion is satisfied
+  while ((norm(U1hatnew - U1hatold, "F") > eps | norm(U2hatnew-U2hatold, "F")>eps) & iter<maxiter)
+  {iter=iter+1
+  U1hatold <- U1hatnew
+  U2hatold <- U2hatnew
+  for (k in 1:K){U2int[, , k] <- t(Xc[, , k]) %*% solve(U1hatold) %*% Xc[, , k]}
+  U2hatnew <- rowSums(U2int, dims = 2) / (n1 * K)
+  U2int <- array(0, c(n2, n2, K))
+  for (k in 1:K){U1int[, , k] <- Xc[, , k] %*% solve(U2hatnew) %*% t(Xc[, , k])}
+  U1hatnew <- rowSums(U1int, dims = 2) / (n2 * K)
+  U1int <- array(0, c(n1, n1, K))
   }
-  iter = 0
-  U2hatold = startmat
-  for (k in 1:K) {
-    U1int[[k]] = Xc[[k]] %*% solve(U2hatold) %*% t(Xc[[k]])
-  }
-  U1hatold <- Reduce("+", U1int)/(n2 * K)
-  U1int <- list()
-  iter = iter + 1
-  for (k in 1:K) {
-    U2int[[k]] = t(Xc[[k]]) %*% solve(U1hatold) %*% Xc[[k]]
-  }
-  U2hatnew <- Reduce("+", U2int)/(n1 * K)
-  U2int <- list()
-  for (k in 1:K) {
-    U1int[[k]] = Xc[[k]] %*% solve(U2hatnew) %*% t(Xc[[k]])
-  }
-  U1hatnew <- Reduce("+", U1int)/(n2 * K)
-  U1int <- list()
-  while ((norm(U1hatnew - U1hatold, "F") > eps | norm(U2hatnew -
-                                                      U2hatold, "F") > eps) & iter < maxiter) {
-    iter = iter + 1
-    U1hatold = U1hatnew
-    U2hatold = U2hatnew
-    for (k in 1:K) {
-      U2int[[k]] = t(Xc[[k]]) %*% solve(U1hatold) %*% Xc[[k]]
-    }
-    U2hatnew <- Reduce("+", U2int)/(n1 * K)
-    U2int <- list()
-    for (k in 1:K) {
-      U1int[[k]] = Xc[[k]] %*% solve(U2hatnew) %*% t(Xc[[k]])
-    }
-    U1hatnew <- Reduce("+", U1int)/(n2 * K)
-    U1int <- list()
-  }
-  if (iter == maxiter) {
+  if(iter == maxiter) {
     Iter <- c("Did not converge at maximum number of iterations given eps. Try to increase maxit and/or decrease eps.")
     Convergence <- FALSE
-  }
-  else {
+  } else  {
     Iter <- iter
-    Convergence <- TRUE
-  }
+    Convergence <- TRUE}
   Shat <- U2hatnew %x% U1hatnew
-  list(Call = formula, Convergence = Convergence, Iter = Iter,
-       Xmeanhat = Xmean, First = c(names(mf)[2], levels(mf[,
-                                                           2])), U1hat = U1hatnew, Standardized.U1hat = U1hatnew/U1hatnew[1,
-                                                                                                                          1], Second = c(names(mf)[3], levels(mf[, 3])), U2hat = U2hatnew,
-       Standardized.U2hat = U2hatnew * (U1hatnew[1, 1]), Shat = Shat)
+  #Printing out results
+  list(Call = formula_2d,
+       Convergence = Convergence,
+       Iter = Iter,
+       Xmeanhat = Xmean,
+       First = c(names(mf)[2], levels(mf[, 2])),
+       U1hat = U1hatnew,
+       Standardized.U1hat = U1hatnew/U1hatnew[1, 1],
+       Second = c(names(mf)[3], levels(mf[, 3])),
+       U2hat = U2hatnew,
+       Standardized.U2hat = U2hatnew*(U1hatnew[1, 1]),
+       Shat = Shat
+  )
 }
-

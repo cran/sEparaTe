@@ -4,14 +4,22 @@
 \alias{mle3d_svc}
 \title{Maximum likelihood estimation of the parameters of a 3rd-order tensor normal distribution}
 \usage{
-mle3d_svc(formula, rep, data = list(), eps, maxiter, startmatU2, startmatU3)
+mle3d_svc(
+  formula_3d,
+  subject,
+  data_3d = list(),
+  eps,
+  maxiter,
+  startmatU2,
+  startmatU3
+)
 }
 \arguments{
-\item{formula}{value3d~Id3+Id4+Id5}
+\item{formula_3d}{value3d~Id3+Id4+Id5}
 
-\item{rep}{the replicate, also called subject or individual, the first column in the tensor (3d) data file}
+\item{subject}{the replicate, also called individual, the first column in the tensor (3d) data file}
 
-\item{data}{the name of the tensor data}
+\item{data_3d}{the name of the tensor data}
 
 \item{eps}{the threshold in the stopping criterion for the iterative mle algorithm}
 
@@ -72,9 +80,9 @@ Manceur AM, Dutilleul P. 2013. Maximum likelihood estimation for the tensor norm
 Algorithm, minimum sample size, and empirical bias and dispersion.
 Journal of Computational and Applied Mathematics 239: 37-49.
 }
+
 \examples{
-output <- mle3d_svc(value3d~Id3+Id4+Id5, rep = "K", data = data3d)
+output <- mle3d_svc(value3d~Id3+Id4+Id5, subject = "K", data = data3d)
 output
 
 }
-

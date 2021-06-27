@@ -4,16 +4,24 @@
 \alias{lrt2d_svc}
 \title{Unbiased modified likelihood ratio test for simple separability of a variance-covariance matrix.}
 \usage{
-lrt2d_svc(formula, rep, data = list(), eps, maxiter, startmat, sign.level,
-  n.simul)
+lrt2d_svc(
+  formula_2d,
+  subject,
+  data_2d = list(),
+  eps,
+  maxiter,
+  startmat,
+  sign.level,
+  n.simul
+)
 }
 \arguments{
-\item{formula}{value2d~Id1+Id2}
+\item{formula_2d}{value2d~Id1+Id2}
 
-\item{rep}{the replicate, also called the subject or individual, the
+\item{subject}{the replicate, also called the subject or individual, the
 first column in the matrix (2d) data file}
 
-\item{data}{the name of the matrix data}
+\item{data_2d}{the name of the matrix data}
 
 \item{eps}{the threshold in the stopping criterion for the iterative mle
 algorithm (estimation)}
@@ -32,9 +40,7 @@ of the LRT statistic}
 
 \item{n.simul}{the number of simulations used to build the sampling distribution
 of the LRT statistic under the null hypothesis, using the same characteristics as the
-i.i.d. random sample from a matrix normal distribution.
-At least 8000 simulations are recommended in applications with same
-characteristics as the example here.}
+i.i.d. random sample from a matrix normal distribution}
 }
 \description{
 A likelihood ratio test (LRT) for simple separability of a
@@ -52,43 +58,43 @@ the observed variable, and is the fourth column in the matrix data file.
 \dQuote{Convergence}, TRUE or FALSE
 
 \dQuote{chi.df}, the theoretical number of degrees of freedom of the
-   asymptotic chi-square distribution that would apply to the unmodified
-   LRT statistic for simple
-   separability of a variance-covariance structure
+asymptotic chi-square distribution that would apply to the unmodified
+LRT statistic for simple
+separability of a variance-covariance structure
 
 \dQuote{Lambda}, the observed value of the unmodified LRT statistic
 
 \dQuote{critical.value}, the critical value at the specified significance
-   level for the chi-square distribution with \dQuote{chi.df} degrees of freedom
+level for the chi-square distribution with \dQuote{chi.df} degrees of freedom
 
 \dQuote{Decision.lambda} will indicate whether or not the null hypothesis of
-   separability was rejected, based on the theoretical LRT statistic
+separability was rejected, based on the theoretical LRT statistic
 
 \dQuote{Simulation.critical.value}, the critical value at the specified
-   significance level that is derived from the sampling distribution of the
-   unbiased modified LRT statistic
+significance level that is derived from the sampling distribution of the
+unbiased modified LRT statistic
 
 \dQuote{Decision.lambda.simulation}, the decision (acceptance/rejection)
-   regarding the null hypothesis of simple separability, made using the
-   theoretical (biased unmodified) LRT
+regarding the null hypothesis of simple separability, made using the
+theoretical (biased unmodified) LRT
 
 \dQuote{Penalty}, the optimized penalty value used in the homothetic
-   transformation between the biased unmodified and unbiased modified LRT statistics
+transformation between the biased unmodified and unbiased modified LRT statistics
 
 \dQuote{U1hat}, the estimated variance-covariance matrix for the rows
 
 \dQuote{Standardized_U1hat}, the standardized estimated variance-covariance
-   matrix for the rows; the standardization is performed by dividing each
-   entry of U1hat by entry(1, 1) of U1hat
+matrix for the rows; the standardization is performed by dividing each
+entry of U1hat by entry(1, 1) of U1hat
 
 \dQuote{U2hat}, the estimated variance-covariance matrix for the columns
 
 \dQuote{Standardized_U2hat}, the standardized estimated variance-covariance
-   matrix for the columns; the standardization is performed by multiplying
-   each entry of U2hat by entry(1, 1) of U1hat
+matrix for the columns; the standardization is performed by multiplying
+each entry of U2hat by entry(1, 1) of U1hat
 
 \dQuote{Shat}, the sample variance-covariance matrix computed from the
-   vectorized data matrices
+vectorized data matrices
 }
 
 \section{References}{
@@ -98,11 +104,9 @@ Manceur AM, Dutilleul P. 2013. Unbiased modified likelihood ratio tests for simp
 separability of a variance-covariance structure. Statistics
 and Probability Letters 83: 631-636.
 }
+
 \examples{
-#To reduce the time elapsed, this example uses only 160 simulations.
-#8000 simulations or more are recommended in an example like this.
-output <- lrt2d_svc(value2d~Id1+Id2, rep = "K", data = data2d, n.simul = 160)
+output <- lrt2d_svc(value2d~Id1+Id2, subject = "K", data_2d = data2d, n.simul = 100)
 output
 
 }
-

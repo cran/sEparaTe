@@ -9,10 +9,10 @@
 #' columns in the matrix (2d) data file, respectively; \dQuote{value2d} refers to
 #' the observed variable, and is the fourth column in the matrix data file.
 #'
-#' @param formula value2d~Id1+Id2
-#' @param rep the replicate, also called the subject or individual, the
+#' @param formula_2d value2d~Id1+Id2
+#' @param subject the replicate, also called the subject or individual, the
 #'    first column in the matrix (2d) data file
-#' @param data the name of the matrix data
+#' @param data_2d the name of the matrix data
 #' @param eps the threshold in the stopping criterion for the iterative mle
 #'    algorithm (estimation)
 #' @param maxiter the maximum number of iterations for the mle algorithm (estimation)
@@ -26,9 +26,7 @@
 #'    of the LRT statistic
 #' @param n.simul the number of simulations used to build the sampling distribution
 #'    of the LRT statistic under the null hypothesis, using the same characteristics as the
-#'    i.i.d. random sample from a matrix normal distribution.
-#'    At least 8000 simulations are recommended in applications with same
-#'    characteristics as the example here.
+#'    i.i.d. random sample from a matrix normal distribution
 #'
 #' @section Output:
 #'
@@ -80,34 +78,22 @@
 #' and Probability Letters 83: 631-636.
 #'
 #' @examples
-#' #To reduce the time elapsed, this example uses only 160 simulations.
-#' #8000 simulations or more are recommended in an example like this.
-#' output <- lrt2d_svc(value2d~Id1+Id2, rep = "K", data = data2d, n.simul = 160)
+#' output <- lrt2d_svc(value2d~Id1+Id2, subject = "K", data_2d = data2d, n.simul = 100)
 #' output
 #'
 #' @export
 
-lrt2d_svc <- function (formula, rep, data = list(), eps, maxiter, startmat,
-                       sign.level, n.simul)
-{
-  formula <- paste(deparse(formula), eval(rep), sep = "+")
-  formula <- stats::as.formula(formula)
-  if (missing(eps) == TRUE) {
-    eps = 1e-06
-  }
-  if (missing(maxiter) == TRUE) {
-    maxiter = 5000
-  }
-  if (missing(sign.level) == TRUE) {
-    sign.level = 0.95
-  }
-  if (missing(n.simul) == TRUE) {
-    n.simul = 8000
-  }
-  mf <- stats::model.frame(formula = formula, data = data)
-  if (sum(is.na(mf)) > 0) {
-    warning("Missing values are not accepted. Try to impute the missing values.")
-  }
+lrt2d_svc<-function(formula_2d, subject, data_2d = list(), eps, maxiter, startmat, sign.level, n.simul)
+{#Enforcing default values
+  formula_2d <- paste(deparse(formula_2d), eval(subject), sep = "+")
+  formula_2d <- stats::as.formula(formula_2d)
+  if (missing(eps) == TRUE){eps <- 1e-6}
+  if (missing(maxiter) == TRUE){maxiter <- 5000}
+  if (missing(sign.level) == TRUE){sign.level <- 0.95}
+  if (missing(n.simul) == TRUE) {n.simul <- 8000}
+  #Quality control of data with warning for missing values, and sample size
+  mf <- stats::model.frame(formula = formula_2d, data = data_2d)
+  if (sum(is.na(mf)) > 0){warning("Missing values are not accepted. Try to impute the missing values.")}
   rpl.mf <- c(dim(mf)[2])
   mf <- mf[order(mf[, rpl.mf]), ]
   colnames(mf)[1] <- "value"
@@ -116,203 +102,161 @@ lrt2d_svc <- function (formula, rep, data = list(), eps, maxiter, startmat,
   n1 <- length(unique(mf[, 2]))
   n2 <- length(unique(mf[, 3]))
   K <- length(unique(mf[, 4]))
-  if (missing(startmat) == TRUE) {
-    startmat <- diag(n2)
-  }
-  is.wholenumber <- function(x, tol = .Machine$double.eps^0.5) abs(x -
-                                                                     round(x)) < tol
-  if (is.wholenumber(max(n1/n2, n2/n1))) {
-    Kmin = max(n1/n2, n2/n1) + 1
-  }
-  else {
-    Kmin = as.integer(max(n1/n2, n2/n1)) + 2
-  }
-  if (K <= Kmin) {
-    print("Sample size insufficient for estimation.")
-  }
-  if (K < (n1 * n2) + 1) {
-    print("Sample size insufficient for LRT of separability")
-  }
-  chi.df <- (n1 * n2 * (((n1 * n2) + 1)/2)) - (n1 * (((n1) +
-                                                        1)/2)) - (n2 * (((n2) + 1)/2)) + 1
+  if (missing(startmat) == TRUE){startmat <- diag(n2)}  #Value of matrix used for initialization
+  is.wholenumber <- function(x, tol = .Machine$double.eps^0.5) abs(x - round(x)) < tol
+  if (is.wholenumber(max(n1 / n2, n2 / n1))) {
+    Kmin <- max(n1 / n2, n2 / n1) + 1
+  } else {
+      Kmin <- as.integer(max(n1 / n2, n2 / n1)) + 2
+      }
+  if (K <= Kmin) {print("Sample size insufficient for estimation.")} #Ensuring sufficient sample size for estimation
+  if (K < (n1 * n2) + 1) {print ("Sample size insufficient for LRT of separability")} #Ensuring sufficient sample size for estimation
+  chi.df <- (n1 * n2 * (((n1 * n2) + 1) / 2)) - (n1 * (((n1) + 1) / 2)) - (n2 * (((n2) + 1) / 2)) + 1
+  #Setting up data for algorithm
   dataX <- split(mf, mf[, rpl.mf])
-  X <- lapply(dataX, function(x) t(matrix(x$value, nrow = n2,
-                                          ncol = n1)))
-  Xmean <- Reduce("+", X)/K
-  Xc <- list()
-  U1int <- list()
-  U2int <- list()
-  for (k in 1:K) {
-    Xc[[k]] <- X[[k]] - Xmean
+  X <- lapply(dataX, function(x) t(matrix(x$value, nrow = n2, ncol = n1)))
+  Xmean <- Reduce("+", X) / K
+  Xc <- array(0, c(n1, n2, K))
+  U1int <- array(0, c(n1, n1, K))
+  U2int <- array(0, c(n2, n2, K))
+  #Initialization of the algorithm
+  for (k in 1:K) {Xc[, , k] <- X[[k]] - Xmean}
+  iter <- 0
+  U2hatold <- startmat
+  for (k in 1:K){U1int[, , k] <- Xc[, , k] %*% solve(U2hatold) %*% t(Xc[, , k])}
+  U1hatold <- rowSums(U1int, dims = 2)/ (n2 * K)
+  U1int <- array(0, c(n1, n1, K))
+  iter <- iter + 1
+  for (k in 1:K){U2int[, , k] <- t(Xc[, , k]) %*% solve(U1hatold) %*% Xc[, , k]}
+  U2hatnew <- rowSums(U2int, dims = 2) / (n1 * K)
+  U2int <- array(0, c(n2, n2, K))
+  for (k in 1:K){U1int[, , k] <- Xc[, , k] %*% solve(U2hatnew) %*% t(Xc[, , k])}
+  U1hatnew <- rowSums(U1int, dims = 2) / (n2 * K)
+  U1int <- array(0, c(n1, n1, K))
+  #IMPORTANT: this is the MLE algorithm with iterations until convergence criterion is satisfied
+  while ((norm(U1hatnew - U1hatold, "F") > eps | norm(U2hatnew - U2hatold, "F") > eps) & iter < maxiter)
+  {iter <- iter + 1
+  U1hatold <- U1hatnew
+  U2hatold <- U2hatnew
+  for (k in 1:K){U2int[, , k] <- t(Xc[, , k]) %*% solve(U1hatold) %*% Xc[, , k]}
+  U2hatnew <- rowSums(U2int, dims = 2) / (n1 * K)
+  U2int <- array(0, c(n2, n2, K))
+  for (k in 1:K){U1int[, , k] <- Xc[, , k] %*% solve(U2hatnew) %*% t(Xc[, , k])}
+  U1hatnew <- rowSums(U1int, dims = 2) / (n2 * K)
+  U1int <- array(0, c(n1, n1, K))
   }
-  iter = 0
-  U2hatold = startmat
-  for (k in 1:K) {
-    U1int[[k]] = Xc[[k]] %*% solve(U2hatold) %*% t(Xc[[k]])
-  }
-  U1hatold <- Reduce("+", U1int)/(n2 * K)
-  U1int <- list()
-  iter = iter + 1
-  for (k in 1:K) {
-    U2int[[k]] = t(Xc[[k]]) %*% solve(U1hatold) %*% Xc[[k]]
-  }
-  U2hatnew <- Reduce("+", U2int)/(n1 * K)
-  U2int <- list()
-  for (k in 1:K) {
-    U1int[[k]] = Xc[[k]] %*% solve(U2hatnew) %*% t(Xc[[k]])
-  }
-  U1hatnew <- Reduce("+", U1int)/(n2 * K)
-  U1int <- list()
-  while ((norm(U1hatnew - U1hatold, "F") > eps | norm(U2hatnew -
-                                                      U2hatold, "F") > eps) & iter < maxiter) {
-    iter = iter + 1
-    U1hatold = U1hatnew
-    U2hatold = U2hatnew
-    for (k in 1:K) {
-      U2int[[k]] = t(Xc[[k]]) %*% solve(U1hatold) %*% Xc[[k]]
-    }
-    U2hatnew <- Reduce("+", U2int)/(n1 * K)
-    U2int <- list()
-    for (k in 1:K) {
-      U1int[[k]] = Xc[[k]] %*% solve(U2hatnew) %*% t(Xc[[k]])
-    }
-    U1hatnew <- Reduce("+", U1int)/(n2 * K)
-    U1int <- list()
-  }
-  if (iter == maxiter) {
+  if(iter == maxiter) {
     Iter <- c("Did not converge at maximum number of iterations given eps. Try to increase maxit and/or decrease eps.")
     Convergence <- FALSE
-  }
-  else {
+  } else {
     Iter <- iter
-    Convergence <- TRUE
-  }
-  X.un <- lapply(X, function(x) as.vector(x))
-  Xmean.un <- Reduce("+", X.un)/K
-  S.un.all <- list()
-  for (k in 1:K) {
-    S.un.all[[k]] = as.matrix(X.un[[k]] - Xmean.un) %*% t(as.matrix(X.un[[k]] -
-                                                                      Xmean.un))
-  }
-  S.un <- Reduce("+", S.un.all)/K
-  Lambda <- K  * ((n2 * log(det(U1hatnew))) + (n1 *
-                                                         log(det(U2hatnew))) - log(det(S.un)))
+    Convergence <- TRUE}
+  #ML estimation under vector normal model
+  X.un <- matrix(0, K, n1*n2)
+  for (k in 1:K) X.un[k, ] <- as.vector(X[[k]])
+  Xmean.un <- apply(X.un, 2, sum) / K
+  S.un.all <- array(0, c(n1 * n2, n1 * n2, K))
+  for (k in 1:K){S.un.all[, , k] <- as.matrix(X.un[k, ] - Xmean.un) %*% t(as.matrix(X.un[k, ] - Xmean.un))}
+  S.un <- rowSums(S.un.all, dims = 2) / K
+  #Lambda
+  Lambda <- (K - 1) * ((n2 * log10(det(U1hatnew))) + (n1 * log10(det(U2hatnew))) - log10(det(S.un)))
   U1out <- U1hatnew
   U2out <- U2hatnew
-  mat.sqrt <- function(A) {
+  #Lambda star
+  mat.sqrt <- function(A)
+  {
     ei <- eigen(A)
     d <- ei$values
-    d <- (d + abs(d))/2
+    d <- (d + abs(d)) / 2
     d2 <- sqrt(d)
     ans <- ei$vectors %*% diag(d2) %*% t(ei$vectors)
   }
-  trueU1 = diag(n1)
-  trueU2 = diag(n2)
-  Lambda.simul <- c()
+  trueU1 <- diag(n1)
+  trueU2 <- diag(n2)
+  Lambda.simul <- rep(0, n.simul)
   for (i in 1:n.simul) {
     Xsimul.all <- list()
-    for (k in 1:K) {
-      Xsimul <- ((mat.sqrt(trueU1)) %*% (matrix(stats::rnorm(n1 *
-                                                               n2), n1, n2)) %*% (mat.sqrt(trueU2)))
-      infoX <- matrix(c(rep(1:n1, each = n2), rep(1:n2,
-                                                  n1), rep(k, n1 * n2)), nrow = n1 * n2, ncol = 3)
+    for (k in 1:K){
+      Xsimul <- ((mat.sqrt(trueU1)) %*% (matrix(stats::rnorm(n1 * n2), n1, n2)) %*% (mat.sqrt(trueU2)))
+      infoX <- matrix(c(rep(1:n1, each = n2), rep(1:n2, n1), rep(k, n1 * n2)), nrow = n1 * n2 , ncol = 3)
       Xsimul <- matrix(t(Xsimul), nrow = n1 * n2, ncol = 1)
       Xsimul.all[[k]] <- cbind(Xsimul, infoX)
     }
     Xsimul.all <- do.call(rbind.data.frame, Xsimul.all)
     names(Xsimul.all) <- c("value", "Id1", "Id2", "K")
-    dataXsimul.all <- split(Xsimul.all, Xsimul.all[, dim(Xsimul.all)[2]])
-    Xsimul.all <- lapply(dataXsimul.all, function(x) t(matrix(x$value,
-                                                              nrow = n2, ncol = n1)))
+    dataXsimul.all <- split(Xsimul.all, Xsimul.all[,dim(Xsimul.all)[2]])
+    Xsimul.all <- lapply(dataXsimul.all, function(x) t(matrix(x$value, nrow = n2, ncol = n1)))
+        #UNSTRUCTURED
     X.un.simul <- lapply(Xsimul.all, function(x) as.vector(x))
-    Xmean.un.simul <- Reduce("+", X.un.simul)/K
-    S.un.all.simul <- list()
-    for (k in 1:K) {
-      S.un.all.simul[[k]] = as.matrix(X.un.simul[[k]] -
-                                        Xmean.un.simul) %*% t(as.matrix(X.un.simul[[k]] -
-                                                                          Xmean.un.simul))
+    Xmean.un.simul <- Reduce("+", X.un.simul) / K
+    S.un.all.simul <- array(0, c(n1*n2, n1*n2, K))
+    for (k in 1:K){S.un.all.simul[, , k] <- as.matrix(X.un.simul[[k]] - Xmean.un.simul) %*% t(as.matrix(X.un.simul[[k]] - Xmean.un.simul))}
+    S.un.simul <- rowSums(S.un.all.simul, dims = 2) / K
+    #SEPARABLE
+    X <- lapply(dataXsimul.all, function(x) t(matrix(x$value, nrow = n2, ncol = n1)))
+    Xmean <- Reduce("+", X) / K
+    Xc <- array(0, c(n1, n2, K))
+    U1int <- array(0, c(n1, n1, K))
+    U2int <- array(0, c(n2, n2, K))
+        #Initialization of the algorithm
+    for (k in 1:K) {Xc[, , k] <- X[[k]] - Xmean}
+    iter <- 0
+    U2hatold <- startmat
+    for (k in 1:K) {U1int[, , k] <- Xc[, , k] %*% solve(U2hatold) %*% t(Xc[, , k])}
+    U1hatold <- rowSums(U1int, dims = 2)/ (n2 * K)
+    U1int <- array(0, c(n1, n1, K))
+    iter <- iter + 1
+    for (k in 1:K){U2int[, , k] <- t(Xc[, , k]) %*% solve(U1hatold) %*% Xc[, , k]}
+    U2hatnew <- rowSums(U2int, dims = 2) / (n1 * K)
+    U2int <- array(0, c(n2, n2, K))
+    for (k in 1:K){U1int[, , k] <- Xc[, , k] %*% solve(U2hatnew) %*% t(Xc[, , k])}
+    U1hatnew <- rowSums(U1int, dims = 2) / (n2 * K)
+    U1int <- array(0, c(n1, n1, K))
+    #IMPORTANT: this is the MLE algorithm with iterations until convergence criterion is satisfied
+    while ((norm(U1hatnew - U1hatold, "F") > eps | norm(U2hatnew - U2hatold, "F") > eps) & iter < maxiter)
+    {iter <- iter + 1
+    U1hatold <- U1hatnew
+    U2hatold <- U2hatnew
+    for (k in 1:K) {U2int[, , k] <- t(Xc[, , k]) %*% solve(U1hatold) %*% Xc[, , k]}
+    U2hatnew <- rowSums(U2int, dims = 2) / (n1 * K)
+    #U2int<-c()
+    U1int <- array(0, c(n1, n1, K))
+    for (k in 1:K) {U1int[, , k] <- Xc[, , k] %*% solve(U2hatnew) %*% t(Xc[, , k])}
+    U1hatnew <- rowSums(U1int, dims = 2) / (n2 * K)
+    U1int <- array(0, c(n1, n1, K))
     }
-    S.un.simul <- Reduce("+", S.un.all.simul)/K
-    X <- lapply(dataXsimul.all, function(x) t(matrix(x$value,
-                                                     nrow = n2, ncol = n1)))
-    Xmean <- Reduce("+", X)/K
-    Xc <- list()
-    U1int <- list()
-    U2int <- list()
-    for (k in 1:K) {
-      Xc[[k]] <- X[[k]] - Xmean
-    }
-    iter = 0
-    U2hatold = startmat
-    for (k in 1:K) {
-      U1int[[k]] = Xc[[k]] %*% solve(U2hatold) %*% t(Xc[[k]])
-    }
-    U1hatold <- Reduce("+", U1int)/(n2 * K)
-    U1int <- list()
-    iter = iter + 1
-    for (k in 1:K) {
-      U2int[[k]] = t(Xc[[k]]) %*% solve(U1hatold) %*% Xc[[k]]
-    }
-    U2hatnew <- Reduce("+", U2int)/(n1 * K)
-    U2int <- list()
-    for (k in 1:K) {
-      U1int[[k]] = Xc[[k]] %*% solve(U2hatnew) %*% t(Xc[[k]])
-    }
-    U1hatnew <- Reduce("+", U1int)/(n2 * K)
-    U1int <- list()
-    while ((norm(U1hatnew - U1hatold, "F") > eps | norm(U2hatnew -
-                                                        U2hatold, "F") > eps) & iter < maxiter) {
-      iter = iter + 1
-      U1hatold = U1hatnew
-      U2hatold = U2hatnew
-      for (k in 1:K) {
-        U2int[[k]] = t(Xc[[k]]) %*% solve(U1hatold) %*%
-          Xc[[k]]
-      }
-      U2hatnew <- Reduce("+", U2int)/(n1 * K)
-      U2int <- list()
-      for (k in 1:K) {
-        U1int[[k]] = Xc[[k]] %*% solve(U2hatnew) %*%
-          t(Xc[[k]])
-      }
-      U1hatnew <- Reduce("+", U1int)/(n2 * K)
-      U1int <- list()
-    }
-    Lambda.simul[[i]] <- K * ((n2 * log(det(U1hatnew))) +
-                                       (n1 * log(det(U2hatnew))) - log(det(S.un.simul)))
+    Lambda.simul[i] <- (K-1) * ((n2 * log10(det(U1hatnew))) + (n1*log10(det(U2hatnew))) - log10(det(S.un.simul)))
   }
-  modified.critical.value <- as.numeric(stats::quantile(Lambda.simul,
-                                                        sign.level))
-  empirical.quantiles <- as.numeric(stats::quantile(Lambda.simul,
-                                                    prob = c(0.01, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95,
-                                                             0.99)))
-  theoretical.quantiles <- as.numeric(stats::quantile(Lambda,
-                                                      prob = c(0.01, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95,
-                                                               0.99)))
+  modified.critical.value <- as.numeric(stats::quantile(Lambda.simul, sign.level))
+  empirical.quantiles <- as.numeric(stats::quantile(Lambda.simul, prob = c(.01, .05, .1, .25, .5, .75, .9, .95, .99)))
+  theoretical.quantiles <- as.numeric(stats::quantile(Lambda, prob = c(.01, .05, .1, .25, .5, .75, .9, .95, .99)))
+  #Decision
   critical.value <- stats::qchisq(sign.level, chi.df)
   Decision.lambda <- c()
-  if (Lambda > critical.value) {
-    Decision.lambda <- c("Reject null hypothesis of separability.")
-  }
-  else {
+  if (Lambda > critical.value){
+    Decision.lambda <- c("Reject null hypothesis of separabiltiy.")
+  } else {
     Decision.lambda <- c("Fail to reject null hypothesis of separability.")
   }
   Decision.lambda.modified <- c()
-  if (Lambda > modified.critical.value) {
-    Decision.lambda.modified <- c("Reject null hypothesis of separability .")
+  if (Lambda > modified.critical.value){
+    Decision.lambda.modified<-c("Reject null hypothesis of separabiltiy.")
+  } else {
+    Decision.lambda.modified<-c("Fail to reject null hypothesis of separability.")
   }
-  else {
-    Decision.lambda.modified <- c("Fail to reject null hypothesis of separability.")
-  }
-  list(Convergence = Convergence, chi.df = chi.df, Lambda = Lambda,
-       critical.value = critical.value, Decision.lambda = Decision.lambda,
+  list(Convergence = Convergence,
+       chi.df = chi.df,
+       Lambda = Lambda,
+       critical.value = critical.value,
+       Decision.lambda = Decision.lambda,
        Simulation.critical.value = modified.critical.value,
        Decision.lambda.simulation = Decision.lambda.modified,
-       Penalty = as.numeric(-(length(unique(mf[, 4]))) * (stats::coef(stats::lm(empirical.quantiles ~
-                                                                                  theoretical.quantiles - 1))) + (length(unique(mf[,
-                                                                                                                                   4])))) , U1hat = U1out, Standardized.U1hat = U1out/U1out[1,
-                                                                                                                                                                                            1], U2hat = U2out, Standardized.U2hat = U2out * U1out[1,
-                                                                                                                                                                                                                                                  1], Shat = (U2out * U1out[1, 1]) %x% (U1out/U1out[1,
-                                                                                                                                                                                                                                                                                                    1]))
+       Penalty = as.numeric(-(length(unique(mf[, 4]))) * (stats::coef(stats::lm(empirical.quantiles ~ theoretical.quantiles - 1))) + (length(unique(mf[,4])))),
+       U1hat = U1out,
+       Standardized.U1hat = U1out / U1out[1, 1],
+       U2hat = U2out,
+       Standardized.U2hat = U2out * U1out[1, 1],
+       Shat = (U2out * U1out[1, 1]) %x% (U1out / U1out[1, 1])
+  )
 }
 
