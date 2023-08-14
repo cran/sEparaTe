@@ -5,9 +5,12 @@
 \title{An unbiased modified likelihood ratio test for double separability of a variance-covariance structure.}
 \usage{
 lrt3d_svc(
-  formula_3d,
+  value3d,
+  Id3,
+  Id4,
+  Id5,
   subject,
-  data_3d = list(),
+  data_3d,
   eps,
   maxiter,
   startmatU2,
@@ -17,10 +20,15 @@ lrt3d_svc(
 )
 }
 \arguments{
-\item{formula_3d}{value3d~Id3+Id4+Id5}
+\item{value3d}{from the formula value3d ~ Id3 + Id4 + Id5}
 
-\item{subject}{the replicate, also called individual, the first column
-in the tensor (3d) data file}
+\item{Id3}{from the formula value3d ~ Id3 + Id4 + Id5}
+
+\item{Id4}{from the formula value3d ~ Id3 + Id4 + Id5}
+
+\item{Id5}{from the formula value3d ~ Id3 + Id4 + Id5}
+
+\item{subject}{the replicate, also called individual}
 
 \item{data_3d}{the name of the tensor data}
 
@@ -52,9 +60,8 @@ structure, modified to be unbiased in finite samples. The modification is a
 penalty-based homothetic transformation of the LRT statistic. The penalty
 value is optimized for a given mean model, which is left unstructured here. In
 the required function, the Id3, Id4 and Id5 variables correspond to the row, column
-and edge subscripts, and are the second, third and fourth columns in the tensor
-(3d) data file, respectively; \dQuote{value3d} refers to the observed
-variable, and is the fifth column in the tensor data file.
+and edge subscripts, respectively; \dQuote{value3d} refers to the observed
+variable.
 }
 \section{Output}{
 
@@ -108,7 +115,8 @@ and Probability Letters 83: 631-636.
 }
 
 \examples{
-output <- lrt3d_svc(value3d~Id3+Id4+Id5, subject = "K", data_3d = data3d, n.simul = 100)
+output <- lrt3d_svc(data3d$value3d, data3d$Id3, data3d$Id4, data3d$Id5,
+            data3d$K, data_3d = data3d, n.simul = 100)
 output
 
 }

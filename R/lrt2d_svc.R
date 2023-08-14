@@ -5,11 +5,12 @@
 #' modification is a penalty-based homothetic transformation of the LRT
 #' statistic. The penalty value is optimized for a given mean model, which is
 #' left unstructured here. In the required function, the Id1 and Id2 variables
-#' correspond to the row and column subscripts, and are the second and third
-#' columns in the matrix (2d) data file, respectively; \dQuote{value2d} refers to
-#' the observed variable, and is the fourth column in the matrix data file.
+#' correspond to the row and column subscripts, respectively; \dQuote{value2d} refers to
+#' the observed variable.
 #'
-#' @param formula_2d value2d~Id1+Id2
+#' @param value2d from the formula value2d ~ Id1 + Id2
+#' @param Id1 from the formula value2d ~ Id1 + Id2
+#' @param Id2 from the formula value2d ~ Id1 + Id2
 #' @param subject the replicate, also called the subject or individual, the
 #'    first column in the matrix (2d) data file
 #' @param data_2d the name of the matrix data
@@ -78,53 +79,50 @@
 #' and Probability Letters 83: 631-636.
 #'
 #' @examples
-#' output <- lrt2d_svc(value2d~Id1+Id2, subject = "K", data_2d = data2d, n.simul = 100)
+#' output <- lrt2d_svc(data2d$value2d, data2d$Id1, data2d$Id2,
+#'             data2d$K, data_2d = data2d, n.simul = 100)
 #' output
 #'
 #' @export
 
-lrt2d_svc<-function(formula_2d, subject, data_2d = list(), eps, maxiter, startmat, sign.level, n.simul)
-{#Enforcing default values
-  formula_2d <- paste(deparse(formula_2d), eval(subject), sep = "+")
-  formula_2d <- stats::as.formula(formula_2d)
+lrt2d_svc <- function(value2d, Id1, Id2, subject, data_2d, eps, maxiter, startmat, sign.level, n.simul) {
+#Enforcing default values
+  formula_2d <- value2d ~ Id1 + Id2
+  data_2d$subject <- subject
+  data_2d$Id1 <- Id1
+  data_2d$Id2 <- Id2
+  data_2d$value2d <- value2d
+  data_2d <- data_2d[order(data_2d$subject, data_2d$Id1, data_2d$Id2), ]
   if (missing(eps) == TRUE){eps <- 1e-6}
   if (missing(maxiter) == TRUE){maxiter <- 5000}
   if (missing(sign.level) == TRUE){sign.level <- 0.95}
   if (missing(n.simul) == TRUE) {n.simul <- 8000}
   #Quality control of data with warning for missing values, and sample size
   mf <- stats::model.frame(formula = formula_2d, data = data_2d)
-  if (sum(is.na(mf)) > 0){warning("Missing values are not accepted. Try to impute the missing values.")}
-  rpl.mf <- c(dim(mf)[2])
-  mf <- mf[order(mf[, rpl.mf]), ]
-  colnames(mf)[1] <- "value"
-  mf[, 2] <- as.numeric(mf[, 2])
-  mf[, 3] <- as.numeric(mf[, 3])
-  n1 <- length(unique(mf[, 2]))
-  n2 <- length(unique(mf[, 3]))
-  K <- length(unique(mf[, 4]))
+  if (sum(is.na(data_2d)) > 0){warning("Missing values are not accepted. Try to impute the missing values.")}
+  data_2d$Id1 <- as.numeric(data_2d$Id1)
+  data_2d$Id2 <- as.numeric(data_2d$Id1)
+  n1 <- length(unique(data_2d$Id1))
+  n2 <- length(unique(data_2d$Id2))
+  K <- length(unique(data_2d$subject))
   if (missing(startmat) == TRUE){startmat <- diag(n2)}  #Value of matrix used for initialization
   is.wholenumber <- function(x, tol = .Machine$double.eps^0.5) abs(x - round(x)) < tol
-  if (is.wholenumber(max(n1 / n2, n2 / n1))) {
-    Kmin <- max(n1 / n2, n2 / n1) + 1
-  } else {
-      Kmin <- as.integer(max(n1 / n2, n2 / n1)) + 2
-      }
+  if (is.wholenumber(max(n1 / n2, n2 / n1))) {Kmin <- max(n1 / n2, n2 / n1) + 1} else {Kmin <- as.integer(max(n1 / n2, n2 / n1)) + 2}
   if (K <= Kmin) {print("Sample size insufficient for estimation.")} #Ensuring sufficient sample size for estimation
   if (K < (n1 * n2) + 1) {print ("Sample size insufficient for LRT of separability")} #Ensuring sufficient sample size for estimation
   chi.df <- (n1 * n2 * (((n1 * n2) + 1) / 2)) - (n1 * (((n1) + 1) / 2)) - (n2 * (((n2) + 1) / 2)) + 1
   #Setting up data for algorithm
-  dataX <- split(mf, mf[, rpl.mf])
-  X <- lapply(dataX, function(x) t(matrix(x$value, nrow = n2, ncol = n1)))
-  Xmean <- Reduce("+", X) / K
+  X <- array(data_2d$value2d, dim = c(n2, n1, K))
+  Xmean <- apply(X = X, MARGIN = c(1, 2), FUN = sum) / K
   Xc <- array(0, c(n1, n2, K))
   U1int <- array(0, c(n1, n1, K))
   U2int <- array(0, c(n2, n2, K))
   #Initialization of the algorithm
-  for (k in 1:K) {Xc[, , k] <- X[[k]] - Xmean}
+  for (k in 1:K) {Xc[, , k] <- X[, , k] - Xmean}
   iter <- 0
   U2hatold <- startmat
   for (k in 1:K){U1int[, , k] <- Xc[, , k] %*% solve(U2hatold) %*% t(Xc[, , k])}
-  U1hatold <- rowSums(U1int, dims = 2)/ (n2 * K)
+  U1hatold <- rowSums(U1int, dims = 2) / (n2 * K)
   U1int <- array(0, c(n1, n1, K))
   iter <- iter + 1
   for (k in 1:K){U2int[, , k] <- t(Xc[, , k]) %*% solve(U1hatold) %*% Xc[, , k]}
@@ -146,14 +144,14 @@ lrt2d_svc<-function(formula_2d, subject, data_2d = list(), eps, maxiter, startma
   U1int <- array(0, c(n1, n1, K))
   }
   if(iter == maxiter) {
-    Iter <- c("Did not converge at maximum number of iterations given eps. Try to increase maxit and/or decrease eps.")
+    Iter <- c("Did not converge at maximum number of iterations given eps. Try to increase maxiter and/or decrease eps.")
     Convergence <- FALSE
   } else {
     Iter <- iter
     Convergence <- TRUE}
   #ML estimation under vector normal model
   X.un <- matrix(0, K, n1*n2)
-  for (k in 1:K) X.un[k, ] <- as.vector(X[[k]])
+  for (k in 1:K) X.un[k, ] <- as.vector(X[, , k])
   Xmean.un <- apply(X.un, 2, sum) / K
   S.un.all <- array(0, c(n1 * n2, n1 * n2, K))
   for (k in 1:K){S.un.all[, , k] <- as.matrix(X.un[k, ] - Xmean.un) %*% t(as.matrix(X.un[k, ] - Xmean.un))}
@@ -251,7 +249,7 @@ lrt2d_svc<-function(formula_2d, subject, data_2d = list(), eps, maxiter, startma
        Decision.lambda = Decision.lambda,
        Simulation.critical.value = modified.critical.value,
        Decision.lambda.simulation = Decision.lambda.modified,
-       Penalty = as.numeric(-(length(unique(mf[, 4]))) * (stats::coef(stats::lm(empirical.quantiles ~ theoretical.quantiles - 1))) + (length(unique(mf[,4])))),
+       Penalty = as.numeric(-(length(unique(subject))) * (stats::coef(stats::lm(empirical.quantiles ~ theoretical.quantiles - 1))) + (length(unique(subject)))),
        U1hat = U1out,
        Standardized.U1hat = U1out / U1out[1, 1],
        U2hat = U2out,

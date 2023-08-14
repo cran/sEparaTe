@@ -9,12 +9,14 @@
 #' matrix), the column (another factor matrix) and the edge (remaining
 #' factor matrix) where two \strong{X}-entries are. In the required function, the
 #' Id3, Id4 and Id5 variables correspond to the row, column and edge
-#' subscripts, and are the second, third and fourth columns in the tensor
-#' (3d) data file, respectively; \dQuote{value3d} indicates the observed
-#' variable, and is the fifth column in the tensor data file.
+#' subscripts, respectively; \dQuote{value3d} indicates the observed
+#' variable.
 #'
-#' @param formula_3d value3d~Id3+Id4+Id5
-#' @param subject the replicate, also called individual, the first column in the tensor (3d) data file
+#' @param value3d from the formula value3d ~ Id3 + Id4 + Id5
+#' @param Id3 from the formula value3d ~ Id3 + Id4 + Id5
+#' @param Id4 from the formula value3d ~ Id3 + Id4 + Id5
+#' @param Id5 from the formula value3d ~ Id3 + Id4 + Id5
+#' @param subject the replicate, also called individual
 #' @param data_3d the name of the tensor data
 #' @param eps the threshold in the stopping criterion for the iterative mle algorithm
 #' @param maxiter the maximum number of iterations for the iterative mle algorithm
@@ -56,37 +58,38 @@
 #' Journal of Computational and Applied Mathematics 239: 37-49.
 #'
 #' @examples
-#' output <- mle3d_svc(value3d~Id3+Id4+Id5, subject = "K", data = data3d)
+#' output <- mle3d_svc(data3d$value3d, data3d$Id3, data3d$Id4, data3d$Id5, data3d$K, data_3d = data3d)
 #' output
 #'
 #' @export
 
-mle3d_svc <- function(formula_3d, subject, data_3d = list(), eps, maxiter, startmatU2, startmatU3)
+mle3d_svc <- function(value3d, Id3, Id4, Id5, subject, data_3d, eps, maxiter, startmatU2, startmatU3)
 {#Enforcing default values
-  formula_3d <- paste(deparse(formula_3d), eval(subject), sep = "+")
-  formula_3d <- stats::as.formula(formula_3d)
+  formula_3d <- value3d ~ Id3 + Id4 + Id5
+  data_3d$subject <- subject
+  data_3d$Id3 <- Id3
+  data_3d$Id4 <- Id4
+  data_3d$Id5 <- Id5
+  data_3d$value3d <- value3d
+  data_3d <- data_3d[order(data_3d$subject, data_3d$Id3, data_3d$Id4, data_3d$Id5), ]
   if (missing(eps) == TRUE){eps <- 1e-6}
   if (missing(maxiter) == TRUE){maxiter <- 100}
   #Quality control of data with warning for missing values, and sample size
-  mf <- stats::model.frame(formula = formula_3d, data = data_3d)
-  if (sum(is.na(mf)) > 0){warning("Missing values are not accepted. Try to impute the missing values.")}
-  colnames(mf)[1] <- "value"
-  rpl.mf <- c(dim(mf)[2])
-  mf <- mf[order(mf[, rpl.mf]), ]
-  mf[, 2] <- as.numeric(mf[, 2])
-  mf[, 3] <- as.numeric(mf[, 3])
-  mf[, 4] <- as.numeric(mf[, 4])
-  n1 <- length(unique(mf[, 2]))
-  n2 <- length(unique(mf[, 3]))
-  n3 <- length(unique(mf[, 4]))
-  K <- length(unique(mf[, rpl.mf]))
+  if (sum(is.na(data_3d)) > 0){warning("Missing values are not accepted. Try to impute the missing values.")}
+  data_3d$Id3 <- as.numeric(data_3d$Id3)
+  data_3d$Id4 <- as.numeric(data_3d$Id4)
+  data_3d$Id5 <- as.numeric(data_3d$Id5)
+  n1 <- length(unique(data_3d$Id3))
+  n2 <- length(unique(data_3d$Id4))
+  n3 <- length(unique(data_3d$Id5))
+  K <- length(unique(data_3d$subject))
   if (missing(startmatU2) == TRUE){startmatU2 <- diag(n2)}  #Value of matrix used for initialization
   if (missing(startmatU3) == TRUE){startmatU3 <- diag(n3)}  #Value of matrix used for initialization
   is.wholenumber <- function(x, tol = .Machine$double.eps^0.5)  abs(x - round(x)) < tol
   if (is.wholenumber(max(n1 / (n2 * n3), n2 / (n1 * n3), n3 / (n1 * n2)))) {Kmin <- max(n1 / (n2 * n3), n2 / (n1 * n3), n3 / (n1 * n2)) + 1} else {Kmin <- as.integer(max(n1 / (n2 * n3), n2 / (n1 * n3), n3 / (n1 * n2))) + 2}
   if (K <= Kmin) {print("Sample size insufficient for estimation.")} #Ensuring sufficient sample size for estimation
   #Setting up data for algorithm
-  X <- array(mf$value, dim = c(n3, n2, n1, K))
+  X <- array(data_3d$value3d, dim = c(n3, n2, n1, K))
   Xmean <- apply(X, MARGIN = c(1, 2, 3), sum) / K
   Xc <- array(0, dim = c(n3, n2, n1, K))
   U1int <- array(0, dim = c(n1, n1, K))
@@ -96,12 +99,12 @@ mle3d_svc <- function(formula_3d, subject, data_3d = list(), eps, maxiter, start
   XU1 <- array(aperm(Xc, perm = c(1, 2, 3, 4)), dim = c(n1, n3 * n2, K))
   XU2 <- array(aperm(Xc, perm = c(2, 1, 3, 4)), dim = c(n2, n3 * n1, K))
   XU3 <- array(aperm(Xc, perm = c(3, 1, 2, 4)), dim = c(n3, n2 * n1, K))
-  U3hatold <- startmatU2
-  U2hatold <- startmatU3
+  U3hatold <- startmatU3
+  U2hatold <- startmatU2
   iter <- 0
   tt1 <- U3hatold %x% U2hatold
   for (k in 1:K){U1int[, , k] <- XU1[, , k] %*% solve(tt1) %*% aperm(XU1[, , k], perm = c(2, 1))}
-  U1hatold<-apply(U1int, MARGIN=c(1,2), sum)/(n2 * n3 * K)
+  U1hatold<-apply(U1int, MARGIN = c(1, 2), sum) / (n2 * n3 * K)
   iter <- iter + 1
   tt2 <- U3hatold %x% U1hatold
   for (k in 1:K){U2int[, , k] <- XU2[, , k] %*% solve(tt2) %*% aperm(XU2[, , k], perm = c(2, 1))}
@@ -129,24 +132,24 @@ mle3d_svc <- function(formula_3d, subject, data_3d = list(), eps, maxiter, start
   U1hatnew <- apply(U1int, MARGIN = c(1, 2), sum) / (n2 * n3 * K)
   }
   if(iter == maxiter) {
-    Iter <- c("Did not converge at maximum number of iterations given eps. Try to increase maxit and/or decrease eps.")
+    Iter <- c("Did not converge at maximum number of iterations given eps. Try to increase maxiter and/or decrease eps.")
     Convergence <- FALSE
   } else {
     Iter <- iter
     Convergence <- TRUE}
-  Shat <- U3hatnew %x% U2hatnew %x% U1hatnew
+    Shat <- U3hatnew %x% U2hatnew %x% U1hatnew
   #Printing out results
   list(Call = formula_3d,
        Convergence = Convergence,
        Iter = Iter,
        Xmeanhat = Xmean,
-       First = c(names(mf)[2], levels(mf[, 2])),
+       First = c("Id3, levels:", levels(as.factor(data_3d$Id3))),
        U1hat = U1hatnew,
        Standardized.U1hat = U1hatnew / U1hatnew[1, 1],
-       Second = c(names(mf)[3], levels(mf[, 3])),
+       Second = c("Id4, levels:", levels(as.factor(data_3d$Id4))),
        U2hat = U2hatnew,
        Standardized.U2hat = U2hatnew * (U1hatnew[1, 1]),
-       Third = c(names(mf)[4], levels(mf[, 4])),
+       Third = c("Id5, levels:", levels(as.factor(data_3d$Id5))),
        U3hat = U3hatnew,
        Shat = Shat
   )

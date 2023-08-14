@@ -5,9 +5,11 @@
 \title{Unbiased modified likelihood ratio test for simple separability of a variance-covariance matrix.}
 \usage{
 lrt2d_svc(
-  formula_2d,
+  value2d,
+  Id1,
+  Id2,
   subject,
-  data_2d = list(),
+  data_2d,
   eps,
   maxiter,
   startmat,
@@ -16,7 +18,11 @@ lrt2d_svc(
 )
 }
 \arguments{
-\item{formula_2d}{value2d~Id1+Id2}
+\item{value2d}{from the formula value2d ~ Id1 + Id2}
+
+\item{Id1}{from the formula value2d ~ Id1 + Id2}
+
+\item{Id2}{from the formula value2d ~ Id1 + Id2}
 
 \item{subject}{the replicate, also called the subject or individual, the
 first column in the matrix (2d) data file}
@@ -48,9 +54,8 @@ variance-covariance matrix, modified to be unbiased in finite samples. The
 modification is a penalty-based homothetic transformation of the LRT
 statistic. The penalty value is optimized for a given mean model, which is
 left unstructured here. In the required function, the Id1 and Id2 variables
-correspond to the row and column subscripts, and are the second and third
-columns in the matrix (2d) data file, respectively; \dQuote{value2d} refers to
-the observed variable, and is the fourth column in the matrix data file.
+correspond to the row and column subscripts, respectively; \dQuote{value2d} refers to
+the observed variable.
 }
 \section{Output}{
 
@@ -106,7 +111,8 @@ and Probability Letters 83: 631-636.
 }
 
 \examples{
-output <- lrt2d_svc(value2d~Id1+Id2, subject = "K", data_2d = data2d, n.simul = 100)
+output <- lrt2d_svc(data2d$value2d, data2d$Id1, data2d$Id2,
+            data2d$K, data_2d = data2d, n.simul = 100)
 output
 
 }

@@ -5,9 +5,12 @@
 \title{Maximum likelihood estimation of the parameters of a 3rd-order tensor normal distribution}
 \usage{
 mle3d_svc(
-  formula_3d,
+  value3d,
+  Id3,
+  Id4,
+  Id5,
   subject,
-  data_3d = list(),
+  data_3d,
   eps,
   maxiter,
   startmatU2,
@@ -15,9 +18,15 @@ mle3d_svc(
 )
 }
 \arguments{
-\item{formula_3d}{value3d~Id3+Id4+Id5}
+\item{value3d}{from the formula value3d ~ Id3 + Id4 + Id5}
 
-\item{subject}{the replicate, also called individual, the first column in the tensor (3d) data file}
+\item{Id3}{from the formula value3d ~ Id3 + Id4 + Id5}
+
+\item{Id4}{from the formula value3d ~ Id3 + Id4 + Id5}
+
+\item{Id5}{from the formula value3d ~ Id3 + Id4 + Id5}
+
+\item{subject}{the replicate, also called individual}
 
 \item{data_3d}{the name of the tensor data}
 
@@ -41,9 +50,8 @@ of random tensor entries, depending on the row (one factor
 matrix), the column (another factor matrix) and the edge (remaining
 factor matrix) where two \strong{X}-entries are. In the required function, the
 Id3, Id4 and Id5 variables correspond to the row, column and edge
-subscripts, and are the second, third and fourth columns in the tensor
-(3d) data file, respectively; \dQuote{value3d} indicates the observed
-variable, and is the fifth column in the tensor data file.
+subscripts, respectively; \dQuote{value3d} indicates the observed
+variable.
 }
 \section{Output}{
 
@@ -82,7 +90,7 @@ Journal of Computational and Applied Mathematics 239: 37-49.
 }
 
 \examples{
-output <- mle3d_svc(value3d~Id3+Id4+Id5, subject = "K", data = data3d)
+output <- mle3d_svc(data3d$value3d, data3d$Id3, data3d$Id4, data3d$Id5, data3d$K, data_3d = data3d)
 output
 
 }

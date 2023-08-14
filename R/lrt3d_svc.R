@@ -5,13 +5,14 @@
 #'    penalty-based homothetic transformation of the LRT statistic. The penalty
 #'    value is optimized for a given mean model, which is left unstructured here. In
 #'    the required function, the Id3, Id4 and Id5 variables correspond to the row, column
-#'    and edge subscripts, and are the second, third and fourth columns in the tensor
-#'    (3d) data file, respectively; \dQuote{value3d} refers to the observed
-#'    variable, and is the fifth column in the tensor data file.
+#'    and edge subscripts, respectively; \dQuote{value3d} refers to the observed
+#'    variable.
 #'
-#' @param formula_3d value3d~Id3+Id4+Id5
-#' @param subject the replicate, also called individual, the first column
-#'    in the tensor (3d) data file
+#' @param value3d from the formula value3d ~ Id3 + Id4 + Id5
+#' @param Id3 from the formula value3d ~ Id3 + Id4 + Id5
+#' @param Id4 from the formula value3d ~ Id3 + Id4 + Id5
+#' @param Id5 from the formula value3d ~ Id3 + Id4 + Id5
+#' @param subject the replicate, also called individual
 #' @param data_3d the name of the tensor data
 #' @param eps the threshold in the stopping criterion for the iterative mle
 #'    algorithm (estimation)
@@ -78,32 +79,34 @@
 #' and Probability Letters 83: 631-636.
 #'
 #' @examples
-#' output <- lrt3d_svc(value3d~Id3+Id4+Id5, subject = "K", data_3d = data3d, n.simul = 100)
+#' output <- lrt3d_svc(data3d$value3d, data3d$Id3, data3d$Id4, data3d$Id5,
+#'             data3d$K, data_3d = data3d, n.simul = 100)
 #' output
 #'
 #' @export
 
-lrt3d_svc <- function(formula_3d, subject, data_3d = list(), eps, maxiter, startmatU2, startmatU3, sign.level, n.simul)
+lrt3d_svc <- function(value3d, Id3, Id4, Id5 , subject, data_3d, eps, maxiter, startmatU2, startmatU3, sign.level, n.simul)
 {#Enforcing default values
-  formula_3d <- paste(deparse(formula_3d), eval(subject), sep = "+")
-  formula_3d <- stats::as.formula(formula_3d)
+  formula_3d <- value3d ~ Id3 + Id4 + Id5
+  data_3d$subject <- subject
+  data_3d$Id3 <- Id3
+  data_3d$Id4 <- Id4
+  data_3d$Id5 <- Id5
+  data_3d$value3d <- value3d
+  data_3d <- data_3d[order(data_3d$subject, data_3d$Id3, data_3d$Id4, data_3d$Id5), ]
   if (missing(eps) == TRUE) {eps <- 1e-6}
   if (missing(maxiter) == TRUE) {maxiter <- 100}
   if (missing(sign.level) == TRUE) {sign.level <- 0.95}
   if (missing(n.simul) == TRUE) {n.simul <- 8000}
   #Quality control of data with warning for missing values, and sample size
-  mf <- stats::model.frame(formula = formula_3d, data = data_3d)
-  if (sum(is.na(mf)) > 0) {warning("Missing values are not accepted. Try to impute the missing values.")}
-  colnames(mf)[1] <- "value"
-  rpl.mf <- c(dim(mf)[2])
-  mf <- mf[order(mf[, rpl.mf]), ]
-  mf[,2] <- as.numeric(mf[,2])
-  mf[,3] <- as.numeric(mf[,3])
-  mf[,4] <- as.numeric(mf[,4])
-  n1 <- length(unique(mf[,2]))
-  n2 <- length(unique(mf[,3]))
-  n3 <- length(unique(mf[,4]))
-  K <- length(unique(mf[,rpl.mf]))
+  if (sum(is.na(data_3d)) > 0) {warning("Missing values are not accepted. Try to impute the missing values.")}
+  data_3d$Id3 <- as.numeric(data_3d$Id3)
+  data_3d$Id4 <- as.numeric(data_3d$Id4)
+  data_3d$Id5 <- as.numeric(data_3d$Id5)
+  n1 <- length(unique(data_3d$Id3))
+  n2 <- length(unique(data_3d$Id4))
+  n3 <- length(unique(data_3d$Id5))
+  K <- length(unique(data_3d$subject))
   if (missing(startmatU2) == TRUE) {startmatU2 <- diag(n2)}  #Value of matrix used for initialization
   if (missing(startmatU3) == TRUE){startmatU3 <- diag(n3)}  #Value of matrix used for initialization
   is.wholenumber <- function(x, tol = .Machine$double.eps^0.5) abs(x - round(x)) < tol
@@ -112,7 +115,7 @@ lrt3d_svc <- function(formula_3d, subject, data_3d = list(), eps, maxiter, start
   if (K < (n1 * n2 * n3) + 1) {print ("Sample size insufficient for LRT of separability")} #Ensuring sufficient sample size for estimation
   chi.df <- (n1 * n2 * n3 * (((n1 * n2 * n3) + 1) / 2)) - (n1 * (((n1) + 1) / 2)) - (n2 * (((n2) + 1) / 2)) - (n3 * (((n3) + 1) / 2)) + 1
   #Setting up data for algorithm
-  X <- array(mf$value, dim = c(n3, n2, n1, K))
+  X <- array(data_3d$value3d, dim = c(n3, n2, n1, K))
   Xmean <- apply(X, MARGIN = c(1, 2, 3), sum) / K
   Xc <- array(0, dim = c(n3, n2, n1, K))
   U1int <- array(0, dim = c(n1, n1, K))
@@ -124,8 +127,8 @@ lrt3d_svc <- function(formula_3d, subject, data_3d = list(), eps, maxiter, start
   XU3 <- array(aperm(Xc, perm = c(3, 1, 2, 4)), dim = c(n3, n2 * n1, K))
   #Initialization of the algorithm
   iter <- 0
-  U3hatold <- startmatU2
-  U2hatold <- startmatU3
+  U3hatold <- startmatU3
+  U2hatold <- startmatU2
   tt1 <- U3hatold %x% U2hatold
   for (k in 1:K) {U1int[ , , k] <- XU1[, , k] %*% solve(tt1) %*% aperm(XU1[, , k], perm = c(2, 1))}
   U1hatold <- apply(U1int, MARGIN = c(1, 2), sum) / (n2 * n3 * K)
@@ -156,7 +159,7 @@ lrt3d_svc <- function(formula_3d, subject, data_3d = list(), eps, maxiter, start
   U1hatnew <- apply(U1int, MARGIN = c(1, 2), sum) / (n2 * n3 * K)
   }
   if(iter == maxiter) {
-    Iter <- c("Did not converge at maximum number of iterations given eps. Try to increase maxit and/or decrease eps.")
+    Iter <- c("Did not converge at maximum number of iterations given eps. Try to increase maxiter and/or decrease eps.")
     Convergence <- FALSE
   } else  {
     Iter <- iter
@@ -169,11 +172,11 @@ lrt3d_svc <- function(formula_3d, subject, data_3d = list(), eps, maxiter, start
   for (k in 1:K) {S.un.all[, , k] <- as.matrix(X.un[k, ] - Xmean.un) %*% t(as.matrix(X.un[k, ] - Xmean.un))}
   S.un <- rowSums(S.un.all, dims = 2) / K
   #Lambda
-  Lambda<-(K - 1) * ((n1 * n2 * log10(det(U3hatnew))) + (n1 * n3 * log10(det(U2hatnew))) + (n2 * n3 * log10(det(U1hatnew))) - log10(det(S.un)))
+  Lambda <- (K - 1) * ((n1 * n2 * log10(det(U3hatnew))) + (n1 * n3 * log10(det(U2hatnew))) + (n2 * n3 * log10(det(U1hatnew))) - log10(det(S.un)))
   U1out <- U1hatnew
   U2out <- U2hatnew
   U3out <- U3hatnew
-  theoretical.quantiles <- as.numeric(stats::quantile(Lambda, prob = c(.01, .05, .1, .25, .5, .75, .9, .95, .99)))
+  theoretical.quantiles <- as.numeric(stats::quantile(Lambda, probs = c(.01, .05, .1, .25, .5, .75, .9, .95, .99)))
   #Lambda star
   trueU1 <- diag(n1)
   trueU2 <- diag(n2)
@@ -207,8 +210,8 @@ lrt3d_svc <- function(formula_3d, subject, data_3d = list(), eps, maxiter, start
     XU3 <- array(aperm(Xc, perm = c(3, 1, 2, 4)), dim = c(n3, n2 * n1, K))
     #Initialization of the algorithm
     iter <- 0
-    U3hatold <- startmatU2
-    U2hatold <- startmatU3
+    U3hatold <- startmatU3
+    U2hatold <- startmatU2
     tt1 <- U3hatold %x% U2hatold
     for (k in 1:K) {U1int[, , k] <- XU1[, , k] %*% solve(tt1) %*% aperm(XU1[, , k], perm = c(2, 1))}
     U1hatold <- apply(U1int, MARGIN = c(1,2), sum) / (n2 * n3 * K)
@@ -230,7 +233,7 @@ lrt3d_svc <- function(formula_3d, subject, data_3d = list(), eps, maxiter, start
     U3hatold <- U3hatnew
     tt2 <- U3hatold %x% U1hatold
     for (k in 1:K) {U2int[, , k] <- XU2[, , k] %*% solve(tt2) %*% aperm(XU2[, , k], perm = c(2, 1))}
-    U2hatnew <- apply(U2int, MARGIN=c(1,2), sum)/(n3*n1*K)
+    U2hatnew <- apply(U2int, MARGIN = c(1, 2), sum) / (n3 * n1 * K)
     tt3 <- U2hatnew %x% U1hatold
     for (k in 1:K) {U3int[, , k] <- XU3[, , k] %*% solve(tt3) %*% aperm(XU3[, , k], perm = c(2, 1))}
     U3hatnew <- apply(U3int, MARGIN = c(1, 2), sum) / (n2 * n1 * K)
@@ -249,7 +252,7 @@ lrt3d_svc <- function(formula_3d, subject, data_3d = list(), eps, maxiter, start
   critical.value <- stats::qchisq(sign.level, chi.df)
   Decision.lambda <- c()
   if (Lambda > critical.value){
-    Decision.lambda <- c("Reject null hypothesis of separabiltiy.")
+    Decision.lambda <- c("Reject null hypothesis of separability.")
   } else {
     Decision.lambda <- c("Fail to reject null hypothesis of separability.")
   }
@@ -266,7 +269,7 @@ lrt3d_svc <- function(formula_3d, subject, data_3d = list(), eps, maxiter, start
        critical.value = critical.value,
        Decision.lambda = Decision.lambda,
        Simulation.critical.value = modified.critical.value,
-       Penalty = as.numeric(-(length(unique(mf[, 4]))) * (stats::coef(stats::lm(empirical.quantiles ~ theoretical.quantiles - 1))) + (length(unique(mf[, 4])))),
+       Penalty = as.numeric(-(length(unique(data_3d$subject))) * (stats::coef(stats::lm(empirical.quantiles ~ theoretical.quantiles - 1))) + (length(unique(data_3d$subject)))),
        Decision.lambda.simulation = Decision.lambda.modified,
        U1hat = U1out,
        Standardized.U1hat = U1out / U1out[1, 1],

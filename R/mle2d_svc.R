@@ -8,13 +8,13 @@
 #'    matrix entries, depending on the row (one factor matrix)
 #'    and the column (the other factor matrix) where two
 #'    \bold{X}-entries are. In the required function, the Id1 and Id2 variables correspond to
-#'    the row and column subscripts, and are the second and third columns in the matrix
-#'    (2d) data file, respectively; \dQuote{value}
-#'    indicates the observed variable, and is the fourth column in the matrix data file.
+#'    the row and column subscripts, respectively; \dQuote{value2d}
+#'    indicates the observed variable.
 #'
-#' @param formula_2d value2d~Id1+Id2
-#' @param subject the replicate, also called individual,
-#'    the first column in the matrix (2d) data file
+#' @param value2d from the formula value2d ~ Id1 + Id2
+#' @param Id1 from the formula value2d ~ Id1 + Id2
+#' @param Id2 from the formula value2d ~ Id1 + Id2
+#' @param subject the replicate, also called individual
 #' @param data_2d the name of the matrix data
 #' @param eps the threshold in the stopping criterion for the iterative mle algorithm
 #' @param maxiter the maximum number of iterations for the iterative mle algorithm
@@ -60,49 +60,45 @@
 #' and Simulation 64: 105-123.
 #'
 #' @examples
-#' output <- mle2d_svc(value2d~Id1+Id2, subject = "K", data_2d = data2d)
+#' output <- mle2d_svc(data2d$value2d, data2d$Id1, data2d$Id2, data2d$K, data_2d = data2d)
 #' output
 #'
 #' @export
 
-mle2d_svc <- function(formula_2d, subject, data_2d = list(), eps, maxiter, startmat)
-  {#Enforcing default values
-  formula_2d <- paste(deparse(formula_2d), eval(subject), sep = "+")
-  formula_2d <- stats::as.formula(formula_2d)
+mle2d_svc <- function(value2d, Id1, Id2, subject, data_2d, eps, maxiter, startmat) {
+  #Enforcing default values
+  formula_2d <- value2d ~ Id1 + Id2
+  data_2d$subject <- subject
+  data_2d$Id1 <- Id1
+  data_2d$Id2 <- Id2
+  data_2d$value2d <- value2d
+  data_2d <- data_2d[order(data_2d$subject, data_2d$Id1, data_2d$Id2), ]
   if (missing(eps) == TRUE) {eps <- 1e-6}
   if (missing(maxiter) == TRUE){maxiter <- 5000}
   #Quality control of data with warning for missing values, and sample size
-  mf <- stats::model.frame(formula = formula_2d, data = data_2d)
-  if (sum(is.na(mf)) > 0) {warning("Missing values are not accepted. Try to impute the missing values.")}
-  colnames(mf)[1] <- "value"
-  rpl.mf <- dim(mf)[2]
-  mf <- mf[order(mf[, rpl.mf]), ]
-  mf[, 2] <- as.numeric(mf[, 2])
-  mf[, 3] <- as.numeric(mf[, 3])
-  n1 <- length(unique(mf[, 2]))
-  n2 <- length(unique(mf[, 3]))
-  K <- length(unique(mf[,4]))
-  #Value of matrix used for initialization
-  if (missing(startmat) == TRUE) {
-    startmat <- diag(n2)
-  }
+  if (sum(is.na(data_2d)) > 0) {warning("Missing values are not accepted. Try to impute the missing values.")}
+  data_2d$Id1 <- as.numeric(data_2d$Id1)
+  data_2d$Id2 <- as.numeric(data_2d$Id2)
+  n1 <- length(unique(data_2d$Id1))
+  n2 <- length(unique(data_2d$Id2))
+  K <- length(unique(data_2d$subject))
+  if (missing(startmat) == TRUE){startmat <- diag(n2)}  #Value of matrix used for initialization
   is.wholenumber <- function(x, tol = .Machine$double.eps^0.5)  abs(x - round(x)) < tol
   if (is.wholenumber(max(n1 / n2, n2 / n1))) {Kmin <- max(n1 / n2, n2 / n1) + 1} else {Kmin <- as.integer(max(n1 / n2, n2 / n1)) + 2}
   #Ensuring sufficient sample size for estimation
   if (K <= Kmin) {print("Sample size insufficient for estimation.")}
   #Setting up data for algorithm
-  dataX <- split(mf, mf[, rpl.mf])
-  X <- lapply(dataX, function(x) t(matrix(x$value, nrow = n2, ncol = n1)))
-  Xmean <- Reduce("+", X) / K
+  X <- array(data_2d$value2d, dim = c(n2, n1, K))
+  Xmean <- apply(X = X, MARGIN = c(1, 2), FUN = sum) / K
   Xc <- array(0, c(n1, n2, K))
   U1int <- array(0, c(n1, n1, K))
   U2int <- array(0, c(n2, n2, K))
   #Initialization of the algorithm
-  for (k in 1:K) {Xc[, , k] <- X[[k]] - Xmean}
+  for (k in 1:K) {Xc[, , k] <- X[, , k] - Xmean}
   iter <- 0
   U2hatold <- startmat
   for (k in 1:K){U1int[, , k] <- Xc[, , k] %*% solve(U2hatold) %*% t(Xc[, , k])}
-  U1hatold <- rowSums(U1int, dims = 2)/ (n2 * K)
+  U1hatold <- rowSums(U1int, dims = 2) / (n2 * K)
   U1int <- array(0, c(n1, n1, K))
   iter <- iter + 1
   for (k in 1:K){U2int[, , k] <- t(Xc[, , k]) %*% solve(U1hatold) %*% (Xc[, , k])}
@@ -124,7 +120,7 @@ mle2d_svc <- function(formula_2d, subject, data_2d = list(), eps, maxiter, start
   U1int <- array(0, c(n1, n1, K))
   }
   if(iter == maxiter) {
-    Iter <- c("Did not converge at maximum number of iterations given eps. Try to increase maxit and/or decrease eps.")
+    Iter <- c("Did not converge at maximum number of iterations given eps. Try to increase maxiter and/or decrease eps.")
     Convergence <- FALSE
   } else  {
     Iter <- iter
@@ -135,10 +131,10 @@ mle2d_svc <- function(formula_2d, subject, data_2d = list(), eps, maxiter, start
        Convergence = Convergence,
        Iter = Iter,
        Xmeanhat = Xmean,
-       First = c(names(mf)[2], levels(mf[, 2])),
+       First = c("Id1, levels:", levels(as.factor(data_2d$Id1))),
        U1hat = U1hatnew,
        Standardized.U1hat = U1hatnew/U1hatnew[1, 1],
-       Second = c(names(mf)[3], levels(mf[, 3])),
+       Second = c("Id2, levels:", levels(as.factor(data_2d$Id2))),
        U2hat = U2hatnew,
        Standardized.U2hat = U2hatnew*(U1hatnew[1, 1]),
        Shat = Shat
