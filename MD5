@@ -1,4 +1,4 @@
-ad96de1c2ff6fc43490c3d7e31d9ce20 *DESCRIPTION
+c8769d152517c5e0267953a0cf6ddb98 *DESCRIPTION
 b11014c7399228dde5acdfcda5b241ef *LICENSE
 393b4d47509c9d3c8bde66ecf0e5e73b *NAMESPACE
 18f3eaa1aa9d729445d968a1755aba00 *R/data2d.R
@@ -11,7 +11,7 @@ d363d970e3052131c4c018b9d4dee0e8 *R/sEparaTe.R
 30b3877af6527c1a14ac4dd0cd286344 *data/data2d.rda
 65691d5cf9183f1037243dc05e00eee9 *data/data3d.rda
 800725ec2ed4124220404b5e28186bf6 *man/data2d.Rd
-1e71e82c33625d6a7a6af7e35709554e *man/data3d.Rd
+12f78c7b09ce0bc2f1367c53b3524e57 *man/data3d.Rd
 02da3159b77dad5c883922e8ff139ba0 *man/lrt2d_svc.Rd
 5ba68f0ccb19c5bf50092376355a4b75 *man/lrt3d_svc.Rd
 b44b124be13d93abfc3e1d0924d5cbb8 *man/mle2d_svc.Rd
